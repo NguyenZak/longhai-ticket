@@ -117,6 +117,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Upload event image
         Route::post('/event-image', [UploadController::class, 'uploadEventImage']);
         
+        // Upload map image
+        Route::post('/map-image', [UploadController::class, 'uploadMapImage']);
+        
         // Upload artist image
         Route::post('/artist-image', [UploadController::class, 'uploadArtistImage']);
         

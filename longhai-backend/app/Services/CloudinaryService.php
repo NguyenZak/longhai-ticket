@@ -11,18 +11,33 @@ class CloudinaryService
 {
     protected $cloudinary;
     protected $uploadApi;
+    protected $isConfigured = false;
 
     public function __construct()
     {
-        $this->cloudinary = new CloudinarySDK([
-            'cloud' => [
-                'cloud_name' => config('cloudinary.cloud_name'),
-                'api_key' => config('cloudinary.api_key'),
-                'api_secret' => config('cloudinary.api_secret'),
-            ],
-        ]);
+        $cloudName = config('cloudinary.cloud_name');
+        $apiKey = config('cloudinary.api_key');
+        $apiSecret = config('cloudinary.api_secret');
         
-        $this->uploadApi = new UploadApi();
+        if (!$cloudName || !$apiKey || !$apiSecret) {
+            Log::warning('Cloudinary configuration missing. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in your .env file.');
+            return;
+        }
+        
+        try {
+            $this->cloudinary = new CloudinarySDK([
+                'cloud' => [
+                    'cloud_name' => $cloudName,
+                    'api_key' => $apiKey,
+                    'api_secret' => $apiSecret,
+                ],
+            ]);
+            
+            $this->uploadApi = new UploadApi();
+            $this->isConfigured = true;
+        } catch (\Exception $e) {
+            Log::error('Failed to initialize Cloudinary: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -30,6 +45,13 @@ class CloudinaryService
      */
     public function uploadImage(UploadedFile $file, $folder = 'longhai-events', $options = [])
     {
+        if (!$this->isConfigured) {
+            return [
+                'success' => false,
+                'error' => 'Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.'
+            ];
+        }
+
         try {
             $defaultOptions = [
                 'folder' => $folder,
@@ -86,6 +108,13 @@ class CloudinaryService
      */
     public function deleteImage($publicId)
     {
+        if (!$this->isConfigured) {
+            return [
+                'success' => false,
+                'error' => 'Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.'
+            ];
+        }
+
         try {
             $result = $this->uploadApi->destroy($publicId);
             
@@ -109,6 +138,10 @@ class CloudinaryService
      */
     public function getImageUrl($publicId, $transformations = [])
     {
+        if (!$this->isConfigured) {
+            return null;
+        }
+
         try {
             $defaultTransformations = [
                 'width' => 800,
@@ -132,6 +165,13 @@ class CloudinaryService
      */
     public function uploadFromUrl($url, $folder = 'longhai-events', $options = [])
     {
+        if (!$this->isConfigured) {
+            return [
+                'success' => false,
+                'error' => 'Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.'
+            ];
+        }
+
         try {
             $defaultOptions = [
                 'folder' => $folder,
@@ -184,5 +224,13 @@ class CloudinaryService
         $transformations = $sizes[$size] ?? $sizes['medium'];
 
         return $this->getImageUrl($publicId, $transformations);
+    }
+
+    /**
+     * Check if Cloudinary is configured
+     */
+    public function isConfigured()
+    {
+        return $this->isConfigured;
     }
 } 

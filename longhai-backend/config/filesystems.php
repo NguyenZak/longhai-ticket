@@ -45,6 +45,7 @@ return [
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
+            // Note: Images are now stored on Cloudinary, not local storage
         ],
 
         's3' => [

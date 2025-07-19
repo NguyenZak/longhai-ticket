@@ -33,16 +33,16 @@ class EventSeeder extends Seeder
             'available_seats' => 850,
             'price' => 500000.00,
             'price_display' => 'Từ 500.000đ',
-            'image' => 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=600&fit=crop',
-            'map_image' => 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop',
+            'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/landscape-panorama',
+            'map_image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/architecture-signs',
             'artists' => [
                 [
                     'name' => 'Hoàng Dũng',
-                    'image' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face'
+                    'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/people/boy-snow-hoodie'
                 ],
                 [
                     'name' => 'Vũ Cát Tường',
-                    'image' => 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=200&h=200&fit=crop&crop=face'
+                    'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/people/girl-north'
                 ]
             ],
             'ticket_prices' => [
@@ -80,12 +80,12 @@ class EventSeeder extends Seeder
             'available_seats' => 5000,
             'price' => 800000.00,
             'price_display' => 'Từ 800.000đ',
-            'image' => 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&h=600&fit=crop',
-            'map_image' => 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop',
+            'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/beach-boat',
+            'map_image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/architecture-signs',
             'artists' => [
                 [
                     'name' => 'Sơn Tùng M-TP',
-                    'image' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face'
+                    'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/people/boy-snow-hoodie'
                 ]
             ],
             'ticket_prices' => [
@@ -123,12 +123,12 @@ class EventSeeder extends Seeder
             'available_seats' => 0,
             'price' => 1200000.00,
             'price_display' => '1.200.000đ',
-            'image' => 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800&h=600&fit=crop',
-            'map_image' => 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop',
+            'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/mountain-lake',
+            'map_image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/architecture-signs',
             'artists' => [
                 [
                     'name' => 'Trần Mạnh Tuấn',
-                    'image' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face'
+                    'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/people/boy-snow-hoodie'
                 ]
             ],
             'ticket_prices' => [

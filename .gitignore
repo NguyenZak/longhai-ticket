@@ -131,6 +131,12 @@ longhai-backend/storage/framework/cache/
 longhai-backend/storage/framework/sessions/
 longhai-backend/storage/framework/views/
 
+# Laravel storage - Images now stored on Cloudinary
+longhai-backend/storage/app/public/events/
+longhai-backend/storage/app/public/artists/
+longhai-backend/storage/app/public/maps/
+longhai-backend/storage/app/public/uploads/
+
 # Docker
 docker-compose.override.yml
 

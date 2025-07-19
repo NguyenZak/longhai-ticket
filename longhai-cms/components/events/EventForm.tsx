@@ -105,18 +105,10 @@ const EventForm: React.FC<EventFormProps> = ({ event, onClose, onSuccess }) => {
         time: toTime24h(time),
       });
       if (event.image) {
-        setImagePreview(
-          event.image.startsWith('http')
-            ? event.image
-            : `${API_BASE_URL.replace(/\/api$/, '')}${event.image}`
-        );
+        setImagePreview(event.image);
       }
       if (event.map_image) {
-        setMapImagePreview(
-          event.map_image.startsWith('http')
-            ? event.map_image
-            : `${API_BASE_URL.replace(/\/api$/, '')}${event.map_image}`
-        );
+        setMapImagePreview(event.map_image);
       }
       if (event.artists) {
         const previews: { [key: number]: string } = {};

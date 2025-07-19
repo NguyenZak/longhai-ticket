@@ -30,6 +30,7 @@ Hệ thống quản lý vé sự kiện và đặt chỗ cho Long Hải Promotio
 - **Laravel 11** - PHP Framework
 - **SQLite** - Database
 - **Laravel Sanctum** - API Authentication
+- **Cloudinary** - Cloud Image Storage & CDN
 - **Docker** - Containerization
 
 ### Frontend
