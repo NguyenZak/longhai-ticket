@@ -261,7 +261,7 @@ const SeatingPage: React.FC = () => {
                     🎨 Chỉnh sửa sơ đồ ghế
                   </h2>
                   <p className="text-gray-600 mt-1">
-                    Sự kiện: {events.find(e => e.id === selectedEvent)?.name}
+                    Sự kiện: {events.find(e => e.id === selectedEvent)?.title}
                   </p>
                 </div>
                 <button

@@ -55,5 +55,3 @@ fi
 
 echo ""
 echo "📖 For detailed instructions, see:"
-echo "   - UPLOAD_FIX_GUIDE.md"
-echo "   - CLOUDINARY_SETUP.md" 

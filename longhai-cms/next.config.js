@@ -9,7 +9,6 @@ const nextConfig = {
         domains: [
             'localhost',
             'images.unsplash.com',
-            'via.placeholder.com',
             'res.cloudinary.com',
         ],
     },

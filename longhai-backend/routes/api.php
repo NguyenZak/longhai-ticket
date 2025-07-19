@@ -10,6 +10,7 @@ use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\SeatingController;
 use App\Http\Controllers\API\ScrumboardController;
 use App\Http\Controllers\API\UploadController;
+use App\Http\Controllers\API\BannerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,6 +30,10 @@ Route::post('/register', [AuthController::class, 'register']);
 // Public event routes for frontend
 Route::get('/events', [EventController::class, 'index']);
 Route::get('/events/{id}', [EventController::class, 'show']);
+
+// Public banner routes for frontend
+Route::get('/banners', [BannerController::class, 'index']);
+Route::get('/banners/all', [BannerController::class, 'all']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -123,7 +128,18 @@ Route::middleware('auth:sanctum')->group(function () {
         // Upload artist image
         Route::post('/artist-image', [UploadController::class, 'uploadArtistImage']);
         
+        // Upload banner image
+        Route::post('/banner-image', [UploadController::class, 'uploadBannerImage']);
+        
         // Delete image
         Route::delete('/image', [UploadController::class, 'deleteImage']);
+    });
+
+    // Admin banner routes
+    Route::prefix('banners')->group(function () {
+        Route::post('/', [BannerController::class, 'store']);
+        Route::put('/{id}', [BannerController::class, 'update']);
+        Route::delete('/{id}', [BannerController::class, 'destroy']);
+        Route::post('/upload', [BannerController::class, 'uploadImage']);
     });
 }); 

@@ -186,7 +186,7 @@ class EventController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Image uploaded successfully',
+                'message' => 'Tải ảnh lên thành công',
                 'data' => [
                     'url' => $url,
                     'filename' => $filename
@@ -195,7 +195,7 @@ class EventController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload image',
+                'message' => 'Tải ảnh lên thất bại',
                 'error' => $e->getMessage()
             ], 500);
         }

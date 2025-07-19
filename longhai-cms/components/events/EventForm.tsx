@@ -1,13 +1,14 @@
-// ... existing code ...
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { apiCall } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/api';
 import { toDateTimeLocal } from '@/lib/dateUtils';
+import { CldImage } from 'next-cloudinary';
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 import 'react-quill/dist/quill.snow.css';
+import { SimpleImageUpload } from './CloudinaryUpload';
 
 interface Event {
   id?: number;
@@ -221,18 +222,27 @@ const EventForm: React.FC<EventFormProps> = ({ event, onClose, onSuccess }) => {
       const fd = new FormData();
       fd.append('image', file);
       const endpoint = isMap ? '/upload/map-image' : '/upload/event-image';
+      
+      console.log('🔄 Uploading image to:', endpoint);
+      console.log('📁 File:', file.name, file.size, file.type);
+      
       const response = await apiCall(endpoint, {
         method: 'POST',
         body: fd,
         headers: {},
       });
       
+      console.log('📥 Upload response:', response);
+      
       if (!response.success) {
+        console.error('❌ Upload failed:', response.message);
         throw new Error(response.message || 'Upload failed');
       }
       
+      console.log('✅ Upload successful, URL:', response.data.url);
       return response.data.url;
     } catch (err: any) {
+      console.error('💥 Upload error:', err);
       const errorMsg = isMap ? 'Tải ảnh sơ đồ thất bại, vui lòng thử lại.' : 'Tải ảnh sự kiện thất bại, vui lòng thử lại.';
       if (isMap) setMapImageError(errorMsg);
       else setImageError(errorMsg);
@@ -269,29 +279,60 @@ const EventForm: React.FC<EventFormProps> = ({ event, onClose, onSuccess }) => {
     setError('');
     try {
       const submitData: any = { ...formData };
-      if (imageFile) submitData.image = await uploadEventImage(imageFile, false);
+      
+      console.log('🔄 Starting form submission...');
+      console.log('📁 Initial submitData:', submitData);
+      
+      if (imageFile) {
+        console.log('🖼️ Uploading event image...');
+        submitData.image = await uploadEventImage(imageFile, false);
+        console.log('✅ Event image uploaded:', submitData.image);
+      }
+      
       if (submitData.artists && submitData.artists.length > 0) {
+        console.log('🎭 Processing artists...');
         for (let i = 0; i < submitData.artists.length; i++) {
           const artist = submitData.artists[i];
           const file = artistImageFiles[i];
-          if (file) artist.image = await uploadArtistImage(file);
-          else if (!artist.image && artistImagePreviews[i]) artist.image = artistImagePreviews[i];
+          if (file) {
+            console.log(`🖼️ Uploading artist ${i} image...`);
+            artist.image = await uploadArtistImage(file);
+            console.log(`✅ Artist ${i} image uploaded:`, artist.image);
+          } else if (!artist.image && artistImagePreviews[i]) {
+            artist.image = artistImagePreviews[i];
+            console.log(`📸 Using existing artist ${i} image:`, artist.image);
+          }
         }
       }
-      if (mapImageFile) submitData.map_image = await uploadEventImage(mapImageFile, true);
+      
+      if (mapImageFile) {
+        console.log('🗺️ Uploading map image...');
+        submitData.map_image = await uploadEventImage(mapImageFile, true);
+        console.log('✅ Map image uploaded:', submitData.map_image);
+      }
+      
       submitData.price = parsePriceInput(formData.price);
       if (submitData.ticket_prices) {
         submitData.ticket_prices = submitData.ticket_prices.map((ticket: any) => ({ ...ticket, price: parsePriceInput(ticket.price) }));
       }
       submitData.time = toTime24h(formData.time);
+      
+      console.log('📤 Final submitData:', submitData);
+      
       if (event?.id) {
+        console.log('🔄 Updating existing event...');
         await apiCall(`/events/${event.id}`, { method: 'PUT', body: JSON.stringify(submitData) });
+        console.log('✅ Event updated successfully');
       } else {
+        console.log('🆕 Creating new event...');
         await apiCall('/events', { method: 'POST', body: JSON.stringify(submitData) });
+        console.log('✅ Event created successfully');
       }
+      
       onSuccess();
       onClose();
     } catch (err: any) {
+      console.error('💥 Form submission error:', err);
       setError(err.message || 'Có lỗi xảy ra');
     } finally {
       setLoading(false);
@@ -299,20 +340,16 @@ const EventForm: React.FC<EventFormProps> = ({ event, onClose, onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {event ? 'Sửa sự kiện' : 'Thêm sự kiện mới'}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          {event ? 'Sửa sự kiện' : 'Thêm sự kiện mới'}
+        </h2>
+      </div>
+      
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">{error}</div>}
+      
+      <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -517,15 +554,23 @@ const EventForm: React.FC<EventFormProps> = ({ event, onClose, onSuccess }) => {
             ))}
           </div>
           {/* Submit Buttons */}
-          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">Hủy</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50">{loading ? 'Đang lưu...' : (event ? 'Cập nhật' : 'Tạo sự kiện')}</button>
+          <div className="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+            >
+              ← Quay lại
+            </button>
+            <div className="flex space-x-4">
+              <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">Hủy</button>
+              <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50">{loading ? 'Đang lưu...' : (event ? 'Cập nhật' : 'Tạo sự kiện')}</button>
+            </div>
           </div>
         </form>
       </div>
-    </div>
+    
   );
 };
 
 export default EventForm;
-// ... existing code ...

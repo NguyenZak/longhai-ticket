@@ -15,13 +15,13 @@ class CloudinaryService
 
     public function __construct()
     {
-        $cloudName = config('cloudinary.cloud_name');
-        $apiKey = config('cloudinary.api_key');
-        $apiSecret = config('cloudinary.api_secret');
+        $cloudName = env('CLOUDINARY_CLOUD_NAME');
+        $apiKey = env('CLOUDINARY_KEY');
+        $apiSecret = env('CLOUDINARY_SECRET');
         
         if (!$cloudName || !$apiKey || !$apiSecret) {
-            Log::warning('Cloudinary configuration missing. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in your .env file.');
-            return;
+            Log::error('Cloudinary configuration missing. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_KEY, and CLOUDINARY_SECRET in your .env file.');
+            throw new \Exception('Cloudinary is not configured. Please check your .env file.');
         }
         
         try {
@@ -33,12 +33,21 @@ class CloudinaryService
                 ],
             ]);
             
-            $this->uploadApi = new UploadApi();
+            $this->uploadApi = $this->cloudinary->uploadApi();
             $this->isConfigured = true;
-            Log::info('Cloudinary initialized successfully');
+            Log::info('Cloudinary initialized successfully with cloud_name: ' . $cloudName);
         } catch (\Exception $e) {
             Log::error('Failed to initialize Cloudinary: ' . $e->getMessage());
+            throw $e;
         }
+    }
+
+    /**
+     * Check if Cloudinary is configured
+     */
+    public function isConfigured()
+    {
+        return $this->isConfigured;
     }
 
     /**
@@ -47,28 +56,21 @@ class CloudinaryService
     public function uploadImage(UploadedFile $file, $folder = 'longhai-events', $options = [])
     {
         if (!$this->isConfigured) {
-            return [
-                'success' => false,
-                'error' => 'Cloudinary is not configured. Please set up your Cloudinary credentials in .env file. See UPLOAD_FIX_GUIDE.md for instructions.'
-            ];
+            throw new \Exception('Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.');
         }
 
         try {
             $defaultOptions = [
                 'folder' => $folder,
-                'resource_type' => 'image',
-                'transformation' => [
-                    'width' => 800,
-                    'height' => 600,
-                    'crop' => 'fill',
-                    'quality' => 'auto',
-                    'fetch_format' => 'auto'
-                ]
+                'resource_type' => 'image'
             ];
 
-            $uploadOptions = array_merge($defaultOptions, $options);
+            // Chỉ thêm transformation nếu có trong options
+            if (!empty($options)) {
+                $defaultOptions = array_merge($defaultOptions, $options);
+            }
 
-            $result = $this->uploadApi->upload($file->getRealPath(), $uploadOptions);
+            $result = $this->uploadApi->upload($file->getRealPath(), $defaultOptions);
 
             return [
                 'success' => true,
@@ -110,10 +112,7 @@ class CloudinaryService
     public function deleteImage($publicId)
     {
         if (!$this->isConfigured) {
-            return [
-                'success' => false,
-                'error' => 'Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.'
-            ];
+            throw new \Exception('Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.');
         }
 
         try {
@@ -140,24 +139,37 @@ class CloudinaryService
     public function getImageUrl($publicId, $transformations = [])
     {
         if (!$this->isConfigured || !$this->cloudinary) {
-            return null;
+            throw new \Exception('Cloudinary is not configured.');
         }
 
         try {
-            $defaultTransformations = [
-                'width' => 800,
-                'height' => 600,
-                'crop' => 'fill',
-                'quality' => 'auto'
-            ];
+            if (empty($transformations)) {
+                return $this->cloudinary->image($publicId)->toUrl();
+            }
 
-            $finalTransformations = array_merge($defaultTransformations, $transformations);
+            // Convert array to transformation string
+            $transformationString = '';
+            if (isset($transformations['width'])) {
+                $transformationString .= 'w_' . $transformations['width'] . ',';
+            }
+            if (isset($transformations['height'])) {
+                $transformationString .= 'h_' . $transformations['height'] . ',';
+            }
+            if (isset($transformations['crop'])) {
+                $transformationString .= 'c_' . $transformations['crop'] . ',';
+            }
+            if (isset($transformations['quality'])) {
+                $transformationString .= 'q_' . $transformations['quality'] . ',';
+            }
 
-            return $this->cloudinary->image($publicId)->toUrl($finalTransformations);
+            // Remove trailing comma
+            $transformationString = rtrim($transformationString, ',');
+
+            return $this->cloudinary->image($publicId)->toUrl($transformationString);
 
         } catch (\Exception $e) {
             Log::error('Cloudinary URL generation failed: ' . $e->getMessage());
-            return null;
+            throw $e;
         }
     }
 
@@ -167,27 +179,21 @@ class CloudinaryService
     public function uploadFromUrl($url, $folder = 'longhai-events', $options = [])
     {
         if (!$this->isConfigured) {
-            return [
-                'success' => false,
-                'error' => 'Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.'
-            ];
+            throw new \Exception('Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.');
         }
 
         try {
             $defaultOptions = [
                 'folder' => $folder,
-                'resource_type' => 'image',
-                'transformation' => [
-                    'width' => 800,
-                    'height' => 600,
-                    'crop' => 'fill',
-                    'quality' => 'auto'
-                ]
+                'resource_type' => 'image'
             ];
 
-            $uploadOptions = array_merge($defaultOptions, $options);
+            // Chỉ thêm transformation nếu có trong options
+            if (!empty($options)) {
+                $defaultOptions = array_merge($defaultOptions, $options);
+            }
 
-            $result = $this->uploadApi->upload($url, $uploadOptions);
+            $result = $this->uploadApi->upload($url, $defaultOptions);
 
             return [
                 'success' => true,
@@ -225,13 +231,5 @@ class CloudinaryService
         $transformations = $sizes[$size] ?? $sizes['medium'];
 
         return $this->getImageUrl($publicId, $transformations);
-    }
-
-    /**
-     * Check if Cloudinary is configured
-     */
-    public function isConfigured()
-    {
-        return $this->isConfigured;
     }
 } 
