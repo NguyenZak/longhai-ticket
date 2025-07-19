@@ -228,27 +228,44 @@ const EventForm: React.FC<EventFormProps> = ({ event, onClose, onSuccess }) => {
     try {
       const fd = new FormData();
       fd.append('image', file);
-      const response = await apiCall(isMap ? '/upload/event-image' : '/upload/event-image', {
+      const endpoint = isMap ? '/upload/map-image' : '/upload/event-image';
+      const response = await apiCall(endpoint, {
         method: 'POST',
         body: fd,
         headers: {},
       });
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Upload failed');
+      }
+      
       return response.data.url;
     } catch (err: any) {
-      if (isMap) setMapImageError('Tải ảnh sơ đồ thất bại, vui lòng thử lại.');
-      else setImageError('Tải ảnh sự kiện thất bại, vui lòng thử lại.');
+      const errorMsg = isMap ? 'Tải ảnh sơ đồ thất bại, vui lòng thử lại.' : 'Tải ảnh sự kiện thất bại, vui lòng thử lại.';
+      if (isMap) setMapImageError(errorMsg);
+      else setImageError(errorMsg);
       throw err;
     }
   };
+
   const uploadArtistImage = async (file: File): Promise<string> => {
-    const fd = new FormData();
-    fd.append('image', file);
-    const response = await apiCall('/upload/artist-image', {
-      method: 'POST',
-      body: fd,
-      headers: {},
-    });
-    return response.data.url;
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const response = await apiCall('/upload/artist-image', {
+        method: 'POST',
+        body: fd,
+        headers: {},
+      });
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Upload failed');
+      }
+      
+      return response.data.url;
+    } catch (err: any) {
+      throw new Error('Tải ảnh nghệ sĩ thất bại, vui lòng thử lại.');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
