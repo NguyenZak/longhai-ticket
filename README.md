@@ -59,7 +59,7 @@ longhai-ticket/
 
 ### 1. Clone repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/NguyenZak/longhai-ticket.git
 cd longhai-ticket
 ```
 
