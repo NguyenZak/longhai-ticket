@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Log;
 
 class CloudinaryService
 {
-    protected $cloudinary;
-    protected $uploadApi;
+    protected $cloudinary = null;
+    protected $uploadApi = null;
     protected $isConfigured = false;
 
     public function __construct()
@@ -35,6 +35,7 @@ class CloudinaryService
             
             $this->uploadApi = new UploadApi();
             $this->isConfigured = true;
+            Log::info('Cloudinary initialized successfully');
         } catch (\Exception $e) {
             Log::error('Failed to initialize Cloudinary: ' . $e->getMessage());
         }
@@ -48,7 +49,7 @@ class CloudinaryService
         if (!$this->isConfigured) {
             return [
                 'success' => false,
-                'error' => 'Cloudinary is not configured. Please set up your Cloudinary credentials in .env file.'
+                'error' => 'Cloudinary is not configured. Please set up your Cloudinary credentials in .env file. See UPLOAD_FIX_GUIDE.md for instructions.'
             ];
         }
 
@@ -138,7 +139,7 @@ class CloudinaryService
      */
     public function getImageUrl($publicId, $transformations = [])
     {
-        if (!$this->isConfigured) {
+        if (!$this->isConfigured || !$this->cloudinary) {
             return null;
         }
 

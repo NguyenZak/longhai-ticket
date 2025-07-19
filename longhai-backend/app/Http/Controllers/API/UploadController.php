@@ -4,16 +4,22 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Services\CloudinaryService;
+use App\Services\MockUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class UploadController extends Controller
 {
-    protected $cloudinaryService;
+    protected $uploadService;
 
     public function __construct(CloudinaryService $cloudinaryService)
     {
-        $this->cloudinaryService = $cloudinaryService;
+        // Use Cloudinary if configured, otherwise use Mock service
+        if ($cloudinaryService->isConfigured()) {
+            $this->uploadService = $cloudinaryService;
+        } else {
+            $this->uploadService = new MockUploadService();
+        }
     }
 
     /**
@@ -36,8 +42,8 @@ class UploadController extends Controller
 
             $file = $request->file('image');
             
-            // Upload to Cloudinary
-            $result = $this->cloudinaryService->uploadImage($file, 'longhai-events', [
+            // Upload using service (Cloudinary or Mock)
+            $result = $this->uploadService->uploadImage($file, 'longhai-events', [
                 'transformation' => [
                     'width' => 1200,
                     'height' => 800,
@@ -50,26 +56,35 @@ class UploadController extends Controller
             if (!$result['success']) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Error uploading to Cloudinary: ' . $result['error']
+                    'message' => 'Error uploading: ' . $result['error']
                 ], 500);
             }
 
-            return response()->json([
+            $response = [
                 'success' => true,
-                'message' => 'Image uploaded successfully to Cloudinary',
+                'message' => 'Image uploaded successfully',
                 'data' => [
                     'url' => $result['url'],
                     'public_id' => $result['public_id'],
                     'width' => $result['width'],
                     'height' => $result['height'],
                     'format' => $result['format'],
-                    'bytes' => $result['bytes'],
-                    'thumbnail_url' => $this->cloudinaryService->getOptimizedImageUrl($result['public_id'], 'thumbnail'),
-                    'small_url' => $this->cloudinaryService->getOptimizedImageUrl($result['public_id'], 'small'),
-                    'medium_url' => $this->cloudinaryService->getOptimizedImageUrl($result['public_id'], 'medium'),
-                    'large_url' => $this->cloudinaryService->getOptimizedImageUrl($result['public_id'], 'large')
+                    'bytes' => $result['bytes']
                 ]
-            ]);
+            ];
+
+            // Add mock info if using mock service
+            if (isset($result['mock'])) {
+                $response['data']['mock'] = true;
+                $response['data']['message'] = $result['message'] ?? 'Mock upload - configure Cloudinary for real uploads';
+            } else {
+                $response['data']['thumbnail_url'] = $this->uploadService->getOptimizedImageUrl($result['public_id'], 'thumbnail');
+                $response['data']['small_url'] = $this->uploadService->getOptimizedImageUrl($result['public_id'], 'small');
+                $response['data']['medium_url'] = $this->uploadService->getOptimizedImageUrl($result['public_id'], 'medium');
+                $response['data']['large_url'] = $this->uploadService->getOptimizedImageUrl($result['public_id'], 'large');
+            }
+
+            return response()->json($response);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -98,8 +113,8 @@ class UploadController extends Controller
 
             $file = $request->file('image');
             
-            // Upload to Cloudinary
-            $result = $this->cloudinaryService->uploadImage($file, 'longhai-artists', [
+            // Upload using service (Cloudinary or Mock)
+            $result = $this->uploadService->uploadImage($file, 'longhai-artists', [
                 'transformation' => [
                     'width' => 400,
                     'height' => 400,
@@ -112,24 +127,33 @@ class UploadController extends Controller
             if (!$result['success']) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Error uploading to Cloudinary: ' . $result['error']
+                    'message' => 'Error uploading: ' . $result['error']
                 ], 500);
             }
 
-            return response()->json([
+            $response = [
                 'success' => true,
-                'message' => 'Artist image uploaded successfully to Cloudinary',
+                'message' => 'Artist image uploaded successfully',
                 'data' => [
                     'url' => $result['url'],
                     'public_id' => $result['public_id'],
                     'width' => $result['width'],
                     'height' => $result['height'],
                     'format' => $result['format'],
-                    'bytes' => $result['bytes'],
-                    'thumbnail_url' => $this->cloudinaryService->getOptimizedImageUrl($result['public_id'], 'thumbnail'),
-                    'small_url' => $this->cloudinaryService->getOptimizedImageUrl($result['public_id'], 'small')
+                    'bytes' => $result['bytes']
                 ]
-            ]);
+            ];
+
+            // Add mock info if using mock service
+            if (isset($result['mock'])) {
+                $response['data']['mock'] = true;
+                $response['data']['message'] = $result['message'] ?? 'Mock upload - configure Cloudinary for real uploads';
+            } else {
+                $response['data']['thumbnail_url'] = $this->uploadService->getOptimizedImageUrl($result['public_id'], 'thumbnail');
+                $response['data']['small_url'] = $this->uploadService->getOptimizedImageUrl($result['public_id'], 'small');
+            }
+
+            return response()->json($response);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -158,8 +182,8 @@ class UploadController extends Controller
 
             $file = $request->file('image');
             
-            // Upload to Cloudinary
-            $result = $this->cloudinaryService->uploadImage($file, 'longhai-maps', [
+            // Upload using service (Cloudinary or Mock)
+            $result = $this->uploadService->uploadImage($file, 'longhai-maps', [
                 'transformation' => [
                     'width' => 800,
                     'height' => 600,
@@ -172,13 +196,13 @@ class UploadController extends Controller
             if (!$result['success']) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Error uploading to Cloudinary: ' . $result['error']
+                    'message' => 'Error uploading: ' . $result['error']
                 ], 500);
             }
 
-            return response()->json([
+            $response = [
                 'success' => true,
-                'message' => 'Map image uploaded successfully to Cloudinary',
+                'message' => 'Map image uploaded successfully',
                 'data' => [
                     'url' => $result['url'],
                     'public_id' => $result['public_id'],
@@ -187,7 +211,15 @@ class UploadController extends Controller
                     'format' => $result['format'],
                     'bytes' => $result['bytes']
                 ]
-            ]);
+            ];
+
+            // Add mock info if using mock service
+            if (isset($result['mock'])) {
+                $response['data']['mock'] = true;
+                $response['data']['message'] = $result['message'] ?? 'Mock upload - configure Cloudinary for real uploads';
+            }
+
+            return response()->json($response);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -216,19 +248,27 @@ class UploadController extends Controller
 
             $publicId = $request->public_id;
             
-            $result = $this->cloudinaryService->deleteImage($publicId);
+            $result = $this->uploadService->deleteImage($publicId);
 
             if (!$result['success']) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Error deleting from Cloudinary: ' . $result['error']
+                    'message' => 'Error deleting: ' . $result['error']
                 ], 500);
             }
 
-            return response()->json([
+            $response = [
                 'success' => true,
-                'message' => 'Image deleted successfully from Cloudinary'
-            ]);
+                'message' => 'Image deleted successfully'
+            ];
+
+            // Add mock info if using mock service
+            if (isset($result['mock'])) {
+                $response['mock'] = true;
+                $response['message'] = 'Mock delete - configure Cloudinary for real deletes';
+            }
+
+            return response()->json($response);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -259,7 +299,7 @@ class UploadController extends Controller
             $files = $request->file('images');
             $folder = $request->input('folder', 'longhai-events');
             
-            $results = $this->cloudinaryService->uploadMultipleImages($files, $folder);
+            $results = $this->uploadService->uploadMultipleImages($files, $folder);
 
             $successCount = count(array_filter($results, fn($r) => $r['success']));
             $failedCount = count($results) - $successCount;
