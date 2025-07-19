@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # Backend Laravel
+  backend:
+    build:
+      context: ./longhai-backend
+      dockerfile: Dockerfile
+    container_name: longhai-backend
+    restart: unless-stopped
+    working_dir: /var/www/
+    volumes:
+      - ./longhai-backend:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - longhai-network
+
+  # Database MySQL
+  db:
+    image: mysql:8.0
+    container_name: longhai-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: longhai_ticket
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: longhai123
+      MYSQL_USER: longhai
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql/data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+    networks:
+      - longhai-network
+
+  # Nginx for Laravel
+  nginx:
+    image: nginx:alpine
+    container_name: longhai-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./longhai-backend:/var/www
+      - ./docker/nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - longhai-network
+    depends_on:
+      - backend
+
+  # CMS Next.js 14
+  cms:
+    build:
+      context: ./longhai-cms
+      dockerfile: Dockerfile
+    container_name: longhai-cms
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./longhai-cms:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    networks:
+      - longhai-network
+
+  # User Frontend Next.js 15
+  user-frontend:
+    build:
+      context: ./longhai-user
+      dockerfile: Dockerfile
+    container_name: longhai-user
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./longhai-user:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    networks:
+      - longhai-network
+
+  # Redis for caching
+  redis:
+    image: redis:alpine
+    container_name: longhai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - longhai-network
+
+networks:
+  longhai-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
