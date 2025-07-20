@@ -52,6 +52,9 @@ class EventController extends Controller
             'total_seats' => 'required|integer|min:1',
             'price' => 'required|numeric|min:0',
             'price_display' => 'nullable|string|max:255',
+            'min_price' => 'nullable|numeric|min:0',
+            'max_price' => 'nullable|numeric|min:0|gte:min_price',
+            'price_range_display' => 'nullable|string|max:255',
             'status' => 'required|in:preparing,active,ended',
             'display_status' => 'nullable|string|max:255',
             'image' => 'nullable|string|max:500',
@@ -94,6 +97,21 @@ class EventController extends Controller
         // Format price to 2 decimal places
         if (isset($data['price'])) {
             $data['price'] = number_format((float)$data['price'], 2, '.', '');
+        }
+        
+        // Format min_price and max_price to 2 decimal places
+        if (isset($data['min_price'])) {
+            $data['min_price'] = number_format((float)$data['min_price'], 2, '.', '');
+        }
+        if (isset($data['max_price'])) {
+            $data['max_price'] = number_format((float)$data['max_price'], 2, '.', '');
+        }
+        
+        // Generate price_range_display if not provided
+        if (empty($data['price_range_display']) && isset($data['min_price']) && isset($data['max_price'])) {
+            $minFormatted = number_format((float)$data['min_price'], 0, ',', '.');
+            $maxFormatted = number_format((float)$data['max_price'], 0, ',', '.');
+            $data['price_range_display'] = "Từ {$minFormatted}đ đến {$maxFormatted}đ";
         }
         
         // Format ticket prices to 2 decimal places
@@ -166,6 +184,9 @@ class EventController extends Controller
             'total_seats' => 'required|integer|min:1',
             'price' => 'required|numeric|min:0',
             'price_display' => 'nullable|string|max:255',
+            'min_price' => 'nullable|numeric|min:0',
+            'max_price' => 'nullable|numeric|min:0|gte:min_price',
+            'price_range_display' => 'nullable|string|max:255',
             'status' => 'required|in:preparing,active,ended',
             'status_display' => 'nullable|string|max:255',
             'image' => 'nullable|string|max:255',
@@ -212,6 +233,21 @@ class EventController extends Controller
         // Format price to 2 decimal places
         if (isset($data['price'])) {
             $data['price'] = number_format((float)$data['price'], 2, '.', '');
+        }
+        
+        // Format min_price and max_price to 2 decimal places
+        if (isset($data['min_price'])) {
+            $data['min_price'] = number_format((float)$data['min_price'], 2, '.', '');
+        }
+        if (isset($data['max_price'])) {
+            $data['max_price'] = number_format((float)$data['max_price'], 2, '.', '');
+        }
+        
+        // Generate price_range_display if not provided
+        if (empty($data['price_range_display']) && isset($data['min_price']) && isset($data['max_price'])) {
+            $minFormatted = number_format((float)$data['min_price'], 0, ',', '.');
+            $maxFormatted = number_format((float)$data['max_price'], 0, ',', '.');
+            $data['price_range_display'] = "Từ {$minFormatted}đ đến {$maxFormatted}đ";
         }
         
         // Format ticket prices to 2 decimal places

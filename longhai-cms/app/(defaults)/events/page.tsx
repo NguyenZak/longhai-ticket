@@ -13,6 +13,7 @@ interface EventData {
   venue: string;
   start_date: string;
   end_date: string;
+  time?: string;
   status: 'preparing' | 'active' | 'ended';
   total_seats: number;
   available_seats: number;
@@ -206,7 +207,7 @@ const EventsPage = () => {
                       Ngày diễn ra
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Giá vé
+                      Giờ diễn ra
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Trạng thái
@@ -240,7 +241,7 @@ const EventsPage = () => {
                               {event.title}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {event.description.substring(0, 50)}...
+                              {event.description.replace(/<[^>]*>/g, '').substring(0, 50)}...
                             </div>
                           </div>
                         </div>
@@ -249,10 +250,17 @@ const EventsPage = () => {
                         <VenueDisplay venue={event.venue} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <DateDisplay date={event.start_date} />
+                        <DateDisplay date={event.start_date} showTime={false} />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {formatCurrency(Number(event.price))}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-sm text-gray-900 dark:text-white">
+                            {event.time || 'Chưa có giờ'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(event.status)}`}>

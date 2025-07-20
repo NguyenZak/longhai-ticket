@@ -9,6 +9,7 @@
         "lint": "next lint"
     },
     "dependencies": {
+        "@craftjs/core": "^0.2.12",
         "@emotion/react": "^11.10.6",
         "@fullcalendar/core": "^6.1.4",
         "@fullcalendar/daygrid": "^6.1.4",
@@ -28,6 +29,7 @@
         "easymde": "^2.18.0",
         "eslint": "8.57.0",
         "eslint-config-next": "14.2.13",
+        "flatpickr": "^4.6.13",
         "formik": "^2.2.9",
         "highlight.js": "^11.7.0",
         "i18next": "^23.13.0",

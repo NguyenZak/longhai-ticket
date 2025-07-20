@@ -37,11 +37,13 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'avatar',
         'phone',
         'address',
         'role',
         'status',
-        'permissions'
+        'permissions',
+        'notification_settings'
     ];
 
     /**
@@ -65,6 +67,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'permissions' => 'array',
+            'notification_settings' => 'array',
         ];
     }
 

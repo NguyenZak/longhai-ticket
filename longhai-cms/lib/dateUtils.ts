@@ -36,13 +36,22 @@ export const formatTimeOnly = (dateString: string): string => {
 
 /**
  * Convert date to datetime-local input format (YYYY-MM-DDTHH:mm, 24h)
+ * Preserves the original timezone to avoid time jumping
  */
 export const toDateTimeLocal = (dateString: string): string => {
   const date = new Date(dateString);
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`; // 24h format
+  
+  // Get local timezone offset in minutes
+  const offset = date.getTimezoneOffset();
+  
+  // Adjust the date to local timezone
+  const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+  
+  const year = localDate.getFullYear();
+  const month = (localDate.getMonth() + 1).toString().padStart(2, '0');
+  const day = localDate.getDate().toString().padStart(2, '0');
+  const hours = localDate.getHours().toString().padStart(2, '0');
+  const minutes = localDate.getMinutes().toString().padStart(2, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }; 

@@ -1,10 +1,10 @@
 import React from 'react';
 
-interface IconPaperclipProps {
+interface IconMoreProps {
   className?: string;
 }
 
-const IconPaperclip: React.FC<IconPaperclipProps> = ({ className = 'w-5 h-5' }) => {
+const IconMore: React.FC<IconMoreProps> = ({ className = 'w-5 h-5' }) => {
   return (
     <svg
       className={className}
@@ -17,10 +17,10 @@ const IconPaperclip: React.FC<IconPaperclipProps> = ({ className = 'w-5 h-5' }) 
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
       />
     </svg>
   );
 };
 
-export default IconPaperclip;
+export default IconMore; 

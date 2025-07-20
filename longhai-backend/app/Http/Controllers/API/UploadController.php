@@ -203,6 +203,58 @@ class UploadController extends Controller
     }
 
     /**
+     * Upload event description image to Cloudinary
+     */
+    public function uploadEventDescriptionImage(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $file = $request->file('image');
+            
+            // Upload using Cloudinary service - no transformation to preserve original
+            $result = $this->uploadService->uploadImage($file, 'longhai-event-descriptions');
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error uploading: ' . $result['error']
+                ], 500);
+            }
+
+            $response = [
+                'success' => true,
+                'message' => 'Event description image uploaded successfully',
+                'data' => [
+                    'url' => $result['url'],
+                    'public_id' => $result['public_id'],
+                    'width' => $result['width'],
+                    'height' => $result['height'],
+                    'format' => $result['format'],
+                    'bytes' => $result['bytes']
+                ]
+            ];
+
+            return response()->json($response);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error uploading event description image: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Upload banner image to Cloudinary
      */
     public function uploadBannerImage(Request $request)

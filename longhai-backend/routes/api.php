@@ -11,6 +11,11 @@ use App\Http\Controllers\API\SeatingController;
 use App\Http\Controllers\API\ScrumboardController;
 use App\Http\Controllers\API\UploadController;
 use App\Http\Controllers\API\BannerController;
+use App\Http\Controllers\API\ProfileController;
+use App\Http\Controllers\API\DashboardController;
+use App\Http\Controllers\API\NotificationController;
+use App\Http\Controllers\API\ReportController;
+use App\Http\Controllers\ChatController;
 
 /*
 |--------------------------------------------------------------------------
@@ -128,6 +133,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Upload artist image
         Route::post('/artist-image', [UploadController::class, 'uploadArtistImage']);
         
+        // Upload event description image
+        Route::post('/event-description-image', [UploadController::class, 'uploadEventDescriptionImage']);
+        
         // Upload banner image
         Route::post('/banner-image', [UploadController::class, 'uploadBannerImage']);
         
@@ -141,5 +149,59 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}', [BannerController::class, 'update']);
         Route::delete('/{id}', [BannerController::class, 'destroy']);
         Route::post('/upload', [BannerController::class, 'uploadImage']);
+    });
+
+    // Chat routes
+    Route::prefix('chat')->group(function () {
+        Route::get('/messages', [ChatController::class, 'getMessages']);
+        Route::post('/messages', [ChatController::class, 'sendMessage']);
+        Route::get('/online-users', [ChatController::class, 'getOnlineUsers']);
+        Route::get('/conversations', [ChatController::class, 'getRecentConversations']);
+        Route::post('/mark-read', [ChatController::class, 'markAsRead']);
+        Route::post('/update-last-seen', [ChatController::class, 'updateLastSeen']);
+    });
+
+    // Profile routes
+    Route::prefix('profile')->group(function () {
+        Route::get('/', [ProfileController::class, 'show']);
+        Route::put('/', [ProfileController::class, 'update']);
+        Route::post('/change-password', [ProfileController::class, 'changePassword']);
+        Route::post('/upload-avatar', [ProfileController::class, 'uploadAvatar']);
+        Route::delete('/avatar', [ProfileController::class, 'deleteAvatar']);
+        Route::get('/stats', [ProfileController::class, 'getStats']);
+        Route::get('/activity', [ProfileController::class, 'getActivity']);
+    });
+
+    // Dashboard routes
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/stats', [DashboardController::class, 'getStats']);
+        Route::get('/activities', [DashboardController::class, 'getRecentActivities']);
+        Route::get('/revenue-chart', [DashboardController::class, 'getRevenueChart']);
+        Route::get('/booking-chart', [DashboardController::class, 'getBookingChart']);
+        Route::get('/top-events', [DashboardController::class, 'getTopEvents']);
+        Route::get('/upcoming-events', [DashboardController::class, 'getUpcomingEvents']);
+        Route::get('/user-growth', [DashboardController::class, 'getUserGrowthChart']);
+        Route::get('/event-stats', [DashboardController::class, 'getEventStats']);
+    });
+
+    // Notification routes
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::get('/unread-count', [NotificationController::class, 'getUnreadCount']);
+        Route::post('/mark-read', [NotificationController::class, 'markAsRead']);
+        Route::delete('/{id}', [NotificationController::class, 'destroy']);
+        Route::delete('/', [NotificationController::class, 'clearAll']);
+        Route::get('/settings', [NotificationController::class, 'getSettings']);
+        Route::put('/settings', [NotificationController::class, 'updateSettings']);
+    });
+
+    // Report routes
+    Route::prefix('reports')->group(function () {
+        Route::get('/bookings', [ReportController::class, 'getBookingReport']);
+        Route::get('/events', [ReportController::class, 'getEventReport']);
+        Route::get('/users', [ReportController::class, 'getUserReport']);
+        Route::get('/revenue', [ReportController::class, 'getRevenueReport']);
+        Route::get('/tickets', [ReportController::class, 'getTicketReport']);
+        Route::get('/export', [ReportController::class, 'exportReport']);
     });
 }); 
