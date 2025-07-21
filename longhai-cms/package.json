@@ -27,6 +27,7 @@
         "@x1mrdonut1x/nouislider-react": "^3.4.3",
         "apexcharts": "^3.37.1",
         "easymde": "^2.18.0",
+        "emoji-picker-react": "^4.13.2",
         "eslint": "8.57.0",
         "eslint-config-next": "14.2.13",
         "flatpickr": "^4.6.13",

@@ -6,31 +6,22 @@ import { useEffect } from 'react';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   fallback?: React.ReactNode;
+  redirectTo?: string; // Tùy chọn: nơi chuyển hướng nếu không login
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  fallback = <div>Loading...</div> 
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  fallback = <div>Loading...</div>,
+  redirectTo = '/auth/login'
 }) => {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
-  // Không redirect nữa, chỉ hiển thị loading hoặc null
-  // useEffect(() => {
-  //   if (!loading && !isAuthenticated) {
-  //     router.push('/auth/login');
-  //   }
-  // }, [isAuthenticated, loading, router]);
-
-  if (loading) {
-    return <>{fallback}</>;
-  }
-
-  if (!isAuthenticated) {
-    return null; // Không redirect nữa, chỉ return null
+  if (loading || !isAuthenticated) {
+    return <>{fallback}</>; // fallback khi loading hoặc chưa xác thực
   }
 
   return <>{children}</>;
 };
 
-export default ProtectedRoute; 
+export default ProtectedRoute;

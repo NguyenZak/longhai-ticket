@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'http://localhost:8000/api';
+export const API_BASE_URL = 'http://localhost:8000';
 
 export interface LoginResponse {
   access_token: string;
@@ -52,6 +52,8 @@ export const logout = (): void => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
+    // Xóa cookie token
+    document.cookie = 'token=; Max-Age=0; path=/;';
   }
 };
 
@@ -71,6 +73,9 @@ export const apiCall = async (
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
+  // Đảm bảo endpoint luôn bắt đầu bằng /api/
+  let url = endpoint.startsWith('/api/') ? `${API_BASE_URL}${endpoint}` : `${API_BASE_URL}/api${endpoint}`;
+
   const config: RequestInit = {
     ...options,
     headers: {
@@ -80,7 +85,7 @@ export const apiCall = async (
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const response = await fetch(url, config);
     const data = await response.json();
 
     if (!response.ok) {
@@ -122,6 +127,8 @@ export const login = async (email: string, password: string): Promise<LoginRespo
   if (typeof window !== 'undefined') {
     localStorage.setItem('access_token', data.access_token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    // Lưu token vào cookie để middleware nhận diện
+    document.cookie = `token=${data.access_token}; path=/;`;
   }
 
   return data;

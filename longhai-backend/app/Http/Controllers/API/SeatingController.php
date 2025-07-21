@@ -14,13 +14,15 @@ use Illuminate\Support\Facades\DB;
 class SeatingController extends Controller
 {
     /**
-     * Get seats for an event
+     * Get seats for an event by ID or slug
      */
     public function getSeats(string $eventId): JsonResponse
     {
         try {
-            // Check if event exists
-            $event = Event::find($eventId);
+            // Check if event exists by ID or slug
+            $event = Event::where('id', $eventId)
+                         ->orWhere('slug', $eventId)
+                         ->first();
             if (!$event) {
                 return response()->json([
                     'success' => false,
@@ -29,7 +31,7 @@ class SeatingController extends Controller
             }
 
             // Get seats for the event
-            $seats = Seat::where('event_id', $eventId)
+            $seats = Seat::where('event_id', $event->id)
                 ->orderBy('row')
                 ->orderBy('column')
                 ->get();

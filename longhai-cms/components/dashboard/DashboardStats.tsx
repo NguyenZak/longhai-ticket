@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { apiCall } from '@/lib/api';
+import ReactApexChart from 'react-apexcharts';
 
 interface StatsData {
   overview: {
@@ -22,15 +23,19 @@ const DashboardStats = () => {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [revenueChart, setRevenueChart] = useState<any>(null);
+  const [bookingChart, setBookingChart] = useState<any>(null);
 
   useEffect(() => {
     fetchStats();
+    fetchRevenueChart();
+    fetchBookingChart();
   }, []);
 
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const data = await apiCall('/dashboard');
+      const data = await apiCall('/dashboard/stats'); // Sửa endpoint tại đây
       console.log('Dashboard stats response:', data);
       setStats(data.data);
     } catch (err: any) {
@@ -38,6 +43,24 @@ const DashboardStats = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRevenueChart = async () => {
+    try {
+      const data = await apiCall('/dashboard/revenue-chart');
+      setRevenueChart(data.data);
+    } catch (err) {
+      setRevenueChart(null);
+    }
+  };
+
+  const fetchBookingChart = async () => {
+    try {
+      const data = await apiCall('/dashboard/booking-chart');
+      setBookingChart(data.data);
+    } catch (err) {
+      setBookingChart(null);
     }
   };
 
@@ -81,8 +104,119 @@ const DashboardStats = () => {
     return new Intl.NumberFormat('vi-VN').format(num);
   };
 
+  const {
+    
+    overview,
+    upcoming_events,
+    recent_bookings,
+  } = stats;
+
   return (
     <div className="space-y-6">
+      {/* Số liệu trong ngày/tháng */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/20">
+              {/* Vé bán được */}
+              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Vé bán hôm nay</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {formatNumber(tickets_sold_today ?? 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/20">
+              {/* Doanh thu hôm nay */}
+              <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Doanh thu hôm nay</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {formatCurrency(revenue_today ?? 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
+              {/* Khách hàng mới */}
+              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Khách mới hôm nay</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {formatNumber(new_customers_today ?? 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/20">
+              {/* Doanh thu tháng */}
+              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Doanh thu tháng</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {formatCurrency(revenue_month ?? 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+        {typeof visits_today === 'number' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-pink-100 dark:bg-pink-900/20">
+                {/* Lượt truy cập hôm nay */}
+                <svg className="w-6 h-6 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Truy cập hôm nay</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                  {formatNumber(visits_today)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        {typeof visits_month === 'number' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900/20">
+                {/* Lượt truy cập tháng */}
+                <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Truy cập tháng</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                  {formatNumber(visits_month)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Overview Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
@@ -95,7 +229,7 @@ const DashboardStats = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng sự kiện</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatNumber(stats.overview.total_events)}
+                {formatNumber(overview.total_events)}
               </p>
             </div>
           </div>
@@ -111,7 +245,7 @@ const DashboardStats = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng đặt vé</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatNumber(stats.overview.total_bookings)}
+                {formatNumber(overview.total_bookings)}
               </p>
             </div>
           </div>
@@ -127,7 +261,7 @@ const DashboardStats = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng vé</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatNumber(stats.overview.total_tickets)}
+                {formatNumber(overview.total_tickets)}
               </p>
             </div>
           </div>
@@ -143,7 +277,7 @@ const DashboardStats = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Doanh thu</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatCurrency(stats.overview.total_revenue)}
+                {formatCurrency(overview.total_revenue)}
               </p>
             </div>
           </div>
@@ -158,8 +292,8 @@ const DashboardStats = () => {
             Sự kiện sắp diễn ra
           </h3>
           <div className="space-y-3">
-            {stats.upcoming_events && stats.upcoming_events.length > 0 ? (
-              stats.upcoming_events.map((event: any) => (
+            {upcoming_events && upcoming_events.length > 0 ? (
+              upcoming_events.map((event: any) => (
                 <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">{event.title}</p>
@@ -186,8 +320,8 @@ const DashboardStats = () => {
             Đặt vé gần đây
           </h3>
           <div className="space-y-3">
-            {stats.recent_bookings && stats.recent_bookings.length > 0 ? (
-              stats.recent_bookings.map((booking: any) => (
+            {recent_bookings && recent_bookings.length > 0 ? (
+              recent_bookings.map((booking: any) => (
                 <div key={booking.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">
@@ -218,6 +352,91 @@ const DashboardStats = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Biểu đồ doanh thu ngày */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm mt-6">
+        <h3 className="text-lg font-semibold mb-4">Biểu đồ doanh thu ngày</h3>
+        <ReactApexChart
+          type="line"
+          height={300}
+          series={[
+            {
+              name: 'Doanh thu',
+              data: (stats?.daily_revenue_chart?.data || stats?.daily_revenue_chart.data),
+            },
+          ]}
+          options={{
+            chart: { id: 'daily-revenue' },
+            xaxis: { categories: (stats?.daily_revenue_chart?.labels || stats?.daily_revenue_chart.labels) },
+            yaxis: { labels: { formatter: formatCurrency } },
+            stroke: { curve: 'smooth' },
+            colors: ['#1B55E2'],
+          }}
+        />
+      </div>
+
+      {/* Biểu đồ doanh thu tháng */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm mt-6">
+        <h3 className="text-lg font-semibold mb-4">Biểu đồ doanh thu tháng</h3>
+        <ReactApexChart
+          type="bar"
+          height={300}
+          series={[
+            {
+              name: 'Doanh thu',
+              data: (stats?.monthly_revenue_chart?.data || stats?.monthly_revenue_chart.data),
+            },
+          ]}
+          options={{
+            chart: { id: 'monthly-revenue' },
+            xaxis: { categories: (stats?.monthly_revenue_chart?.labels || stats?.monthly_revenue_chart.labels) },
+            yaxis: { labels: { formatter: formatCurrency } },
+            colors: ['#805dca'],
+          }}
+        />
+      </div>
+
+      {/* Biểu đồ doanh thu tổng hợp (theo tháng) */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm mt-6">
+        <h3 className="text-lg font-semibold mb-4">Biểu đồ tổng doanh thu</h3>
+        <ReactApexChart
+          type="area"
+          height={300}
+          series={[
+            {
+              name: 'Doanh thu',
+              data: (revenueChart?.data || revenueChart.data),
+            },
+          ]}
+          options={{
+            chart: { id: 'revenue-chart' },
+            xaxis: { categories: (revenueChart?.labels || revenueChart.labels) },
+            yaxis: { labels: { formatter: formatCurrency } },
+            colors: ['#00ab55'],
+          }}
+        />
+      </div>
+
+      {/* Biểu đồ số lượng đặt vé theo tháng */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm mt-6">
+        <h3 className="text-lg font-semibold mb-4">Biểu đồ số lượng đặt vé</h3>
+        <ReactApexChart
+          type="bar"
+          height={300}
+          series={[
+            {
+              name: 'Đặt vé',
+              data: (bookingChart?.data || bookingChart.data),
+            },
+          ]}
+          options={{
+            chart: { id: 'booking-chart' },
+            xaxis: { categories: (bookingChart?.labels || bookingChart.labels) },
+            yaxis: { labels: { formatter: formatNumber } },
+            colors: ['#e7515a'],
+          }}
+        />
       </div>
     </div>
   );

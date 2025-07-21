@@ -18,15 +18,40 @@ class DashboardController extends Controller
      */
     public function getStats()
     {
+        $today = now()->startOfDay();
+        $monthStart = now()->startOfMonth();
+
+        $ticketsSoldToday = \App\Models\Booking::where('status', 'paid')
+            ->whereDate('created_at', $today)
+            ->count();
+
+        $revenueToday = \App\Models\Booking::where('status', 'paid')
+            ->whereDate('created_at', $today)
+            ->sum('total_amount');
+
+        $newCustomersToday = \App\Models\User::whereDate('created_at', $today)->count();
+
+        $revenueMonth = \App\Models\Booking::where('status', 'paid')
+            ->where('created_at', '>=', $monthStart)
+            ->sum('total_amount');
+
+        // Nếu có bảng log truy cập website, ví dụ: visits
+        $visitsToday = class_exists('App\\Models\\Visit') ? \App\Models\Visit::whereDate('created_at', $today)->count() : null;
+        $visitsMonth = class_exists('App\\Models\\Visit') ? \App\Models\Visit::where('created_at', '>=', $monthStart)->count() : null;
+
         $stats = [
+            'tickets_sold_today' => $ticketsSoldToday,
+            'revenue_today' => $revenueToday,
+            'new_customers_today' => $newCustomersToday,
+            'revenue_month' => $revenueMonth,
+            'visits_today' => $visitsToday,
+            'visits_month' => $visitsMonth,
+            // Các số liệu tổng quan khác
             'total_events' => Event::count(),
             'total_bookings' => Booking::count(),
             'total_tickets' => Ticket::count(),
             'total_users' => User::count(),
             'revenue' => Booking::where('status', 'paid')->sum('total_amount'),
-            'pending_bookings' => Booking::where('status', 'pending')->count(),
-            'upcoming_events' => Event::where('start_date', '>', now())->count(),
-            'active_users' => User::where('last_seen_at', '>=', now()->subDays(7))->count(),
         ];
 
         return response()->json([

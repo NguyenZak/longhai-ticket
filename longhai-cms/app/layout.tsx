@@ -3,7 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import 'react-perfect-scrollbar/dist/css/styles.css';
 import '../styles/tailwind.css';
 import { Metadata } from 'next';
-import { Nunito } from 'next/font/google';
+import { Inter } from 'next/font/google';
 
 export const metadata: Metadata = {
     title: {
@@ -11,17 +11,17 @@ export const metadata: Metadata = {
         default: 'Long Hai Ticket CMS',
     },
 };
-const nunito = Nunito({
+const inter = Inter({
     weight: ['400', '500', '600', '700', '800'],
     subsets: ['latin'],
     display: 'swap',
-    variable: '--font-nunito',
+    variable: '--font-inter',
 });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
         <html lang="en">
-            <body className={nunito.variable}>
+            <body className={inter.variable}>
                 <AuthProvider>
                     <ProviderComponent>{children}</ProviderComponent>
                 </AuthProvider>

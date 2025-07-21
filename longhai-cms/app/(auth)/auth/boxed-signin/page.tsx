@@ -9,10 +9,10 @@ import Link from 'next/link';
 import React from 'react';
 
 export const metadata: Metadata = {
-    title: 'Login Boxed',
+    title: 'Sign In',
 };
 
-const BoxedSignIn = () => {
+const BoxSignInPage = () => {
     return (
         <div>
             <div className="absolute inset-0">
@@ -93,4 +93,4 @@ const BoxedSignIn = () => {
     );
 };
 
-export default BoxedSignIn;
+export default BoxSignInPage;

@@ -15,6 +15,7 @@ use App\Http\Controllers\API\ProfileController;
 use App\Http\Controllers\API\DashboardController;
 use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\API\ReportController;
+use App\Http\Controllers\API\NewsController;
 use App\Http\Controllers\ChatController;
 
 /*
@@ -31,17 +32,27 @@ use App\Http\Controllers\ChatController;
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
-
-// Public event routes for frontend
+// Public API cho user site
 Route::get('/events', [EventController::class, 'index']);
-Route::get('/events/{id}', [EventController::class, 'show']);
-
-// Public banner routes for frontend
+Route::get('/news/featured', [NewsController::class, 'featured']);
 Route::get('/banners', [BannerController::class, 'index']);
-Route::get('/banners/all', [BannerController::class, 'all']);
+Route::get('/news', [NewsController::class, 'index']);
 
-// Protected routes
+// Protected routes (bảo vệ tất cả các API còn lại)
 Route::middleware('auth:sanctum')->group(function () {
+    // Event routes
+    Route::get('/events/{id}', [EventController::class, 'show']);
+
+    // Banner routes
+    Route::get('/banners/all', [BannerController::class, 'all']);
+
+    // News routes
+    Route::get('/news/categories', [NewsController::class, 'categories']);
+    Route::get('/news/slug/{slug}', [NewsController::class, 'showBySlug']);
+
+    // Seating routes
+    Route::get('/seats/{eventId}', [SeatingController::class, 'getSeats']);
+
     // User profile
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -149,6 +160,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}', [BannerController::class, 'update']);
         Route::delete('/{id}', [BannerController::class, 'destroy']);
         Route::post('/upload', [BannerController::class, 'uploadImage']);
+    });
+
+    // Admin news routes
+    Route::prefix('news')->group(function () {
+        Route::get('/{id}', [NewsController::class, 'show']);
+        Route::post('/', [NewsController::class, 'store']);
+        Route::put('/{id}', [NewsController::class, 'update']);
+        Route::delete('/{id}', [NewsController::class, 'destroy']);
+        Route::post('/{id}/toggle-featured', [NewsController::class, 'toggleFeatured']);
+        Route::post('/{id}/publish', [NewsController::class, 'publish']);
+        Route::post('/{id}/archive', [NewsController::class, 'archive']);
+        Route::post('/{id}/duplicate', [NewsController::class, 'duplicate']);
     });
 
     // Chat routes

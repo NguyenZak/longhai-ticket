@@ -21,13 +21,10 @@ const ComponentsAuthLoginForm = () => {
     useEffect(() => {
         const token = getToken();
         const userData = getUser();
-        
         if (token && userData) {
-            console.log('✅ User already authenticated, redirecting to dashboard');
-            setUser(userData);
             router.push('/');
         }
-    }, [router, setUser]);
+    }, [router]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;

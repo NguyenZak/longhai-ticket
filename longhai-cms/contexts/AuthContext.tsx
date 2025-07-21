@@ -112,6 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('🔧 AuthContext: handleLogout called');
     logout();
     setUser(null);
+    setAuthKey(prev => prev + 1); // Force reload state
     // Broadcast logout event
     if (authChannel) {
       authChannel.postMessage({ type: 'LOGOUT' });
@@ -121,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleSetUser = (userData: any) => {
     console.log('🔧 AuthContext: handleSetUser called', userData);
     setUser(userData);
+    setAuthKey(prev => prev + 1); // Force reload state
   };
 
   const value = {

@@ -19,7 +19,7 @@ const UserMenu: React.FC = () => {
       
       console.log('✅ Logout successful');
       
-      // Không redirect nữa
+      router.push('/auth/login');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

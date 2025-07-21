@@ -226,7 +226,7 @@ const ProfileSettings: React.FC = () => {
         });
 
         if (response.success) {
-          setUser(prev => prev ? { ...prev, avatar: null } : null);
+          setUser(prev => prev ? { ...prev, avatar: undefined } : null);
           setAvatarPreview('');
           
           await Swal.fire({
