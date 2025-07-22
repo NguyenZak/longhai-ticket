@@ -5,6 +5,7 @@ import EventForm from '@/components/events/EventForm';
 import VenueDisplay from '@/components/events/VenueDisplay';
 import DateDisplay from '@/components/common/DateDisplay';
 import { formatDate } from '@/lib/dateUtils';
+import Swal from 'sweetalert2';
 
 interface EventData {
   id: number;
@@ -30,6 +31,9 @@ const EventsPage = () => {
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingId, setDeletingId] = useState<number|null>(null);
 
   useEffect(() => {
     fetchEvents();
@@ -48,8 +52,16 @@ const EventsPage = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Bạn có chắc muốn xóa sự kiện này?')) return;
-    
+    const result = await Swal.fire({
+      title: 'Bạn có chắc muốn xóa sự kiện này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xoá',
+      cancelButtonText: 'Huỷ',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+    });
+    if (!result.isConfirmed) return;
     try {
       await apiCall(`/events/${id}`, { method: 'DELETE' });
       fetchEvents();
@@ -106,6 +118,9 @@ const EventsPage = () => {
     }
   };
 
+  // Lọc sự kiện theo trạng thái
+  const filteredEvents = statusFilter === 'all' ? events : events.filter(e => e.status === statusFilter);
+
   if (loading) {
     return (
       <div className="p-6">
@@ -153,24 +168,48 @@ const EventsPage = () => {
             </div>
           </div>
 
+          {/* Toggle trạng thái sự kiện */}
+          <div className="flex gap-2 mb-4">
+            {[
+              { label: 'Tất cả', value: 'all' },
+              { label: 'Sắp mở bán', value: 'preparing' },
+              { label: 'Đang mở bán', value: 'active' },
+              { label: 'Đã kết thúc', value: 'ended' },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setStatusFilter(opt.value)}
+                className={`px-4 py-2 rounded-full border transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${statusFilter === opt.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-gray-600'}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           {/* Modal xác nhận xoá hàng loạt */}
           {showBulkDeleteModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-                <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Xác nhận xoá</h2>
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              {/* Overlay */}
+              <div className="absolute inset-0 bg-black bg-opacity-40 backdrop-blur-sm transition-opacity animate-fadeIn"></div>
+              {/* Popup */}
+              <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-200 dark:border-gray-700 animate-popupIn">
+                <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  Xác nhận xoá
+                </h2>
                 <p className="mb-6 text-gray-700 dark:text-gray-300">
                   Bạn có chắc chắn muốn xoá <b>{selectedIds.length}</b> sự kiện đã chọn không? Hành động này không thể hoàn tác.
                 </p>
                 <div className="flex justify-end gap-3">
                   <button
                     onClick={() => setShowBulkDeleteModal(false)}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
                   >
                     Huỷ
                   </button>
                   <button
                     onClick={handleBulkDelete}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm transition"
                   >
                     Xoá
                   </button>
@@ -218,7 +257,7 @@ const EventsPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {events.map((event) => (
+                  {filteredEvents.map((event) => (
                     <tr key={event.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-4">
                         <input

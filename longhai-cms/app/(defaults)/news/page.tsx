@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiCall } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,6 @@ import IconUser from '@/components/icon/icon-user';
 import IconClock from '@/components/icon/icon-clock';
 import Link from "next/link";
 import axios from 'axios';
-import ComponentsDatatablesAdvanced from '../../../components/datatables/components-datatables-advanced';
 import '../../../styles/datatables.css';
 
 interface News {
@@ -71,6 +70,8 @@ export default function NewsPage() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<{id:number, name:string, slug:string, type:string}[]>([]);
+  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+  // Xoá ref dropdownRef và useEffect lắng nghe click ngoài
 
   useEffect(() => {
     fetchNews();
@@ -198,12 +199,28 @@ export default function NewsPage() {
     }
   };
 
+  // Thêm hàm xử lý bản nháp nếu chưa có
+  const handleDraft = async (id: number) => {
+    // Ví dụ: chuyển trạng thái về draft, hoặc gọi API tương ứng
+    try {
+      const data = await apiCall(`/news/${id}/draft`, { method: 'POST' });
+      if (data.success) {
+        showMessage('Tin tức đã chuyển về bản nháp', 'success');
+        fetchNews();
+      } else {
+        showMessage(data.message || 'Không thể chuyển về bản nháp', 'error');
+      }
+    } catch (error) {
+      showMessage('Không thể chuyển về bản nháp', 'error');
+    }
+  };
+
+  // Lọc realtime trên client
   const filteredNews = news.filter(item => {
     const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
-    
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
@@ -330,27 +347,108 @@ export default function NewsPage() {
             className="w-full md:w-48 h-10 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">Tất cả danh mục</option>
-            <option value="Sự kiện">Sự kiện</option>
-            <option value="Nghệ sĩ">Nghệ sĩ</option>
-            <option value="Thông báo">Thông báo</option>
-            <option value="Behind the scenes">Behind the scenes</option>
-            <option value="Phỏng vấn">Phỏng vấn</option>
-            <option value="Công nghệ">Công nghệ</option>
+            {categoryOptions.map(cat => (
+              <option key={cat.slug} value={cat.slug}>{cat.name}</option>
+            ))}
           </select>
         </div>
       </Card>
 
       {/* News Table */}
-      <ComponentsDatatablesAdvanced
-        data={filteredNews}
-        onPreview={setPreviewNews}
-        onEdit={news => window.location.href = `/news/${news.id}/edit`}
-        onDelete={handleDelete}
-        onToggleFeatured={handleToggleFeatured}
-        onPublish={handlePublish}
-        onArchive={handleArchive}
-        onDuplicate={handleDuplicate}
-      />
+      <div className="panel mt-6">
+        <h5 className="mb-5 text-lg font-semibold dark:text-white-light"></h5>
+        <div className="datatables">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-hover whitespace-nowrap">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tiêu đề</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Danh mục</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tác giả</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Trạng thái</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ngày đăng</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredNews.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center text-gray-500 py-8">Không có dữ liệu để hiển thị</td>
+                  </tr>
+                ) : (
+                  filteredNews.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {item.image && <img src={item.image} alt={item.title} className="w-10 h-10 object-cover rounded" />}
+                          <div>
+                            <div className="font-semibold line-clamp-1">{item.title}</div>
+                            <div className="text-xs text-gray-500 line-clamp-1">{item.excerpt}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="badge badge-outline-primary">{getCategoryName(item.category)}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="flex items-center"><IconUser className="w-4 h-4 mr-1" />{item.author}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getStatusBadge(item.status)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {formatDate(item.published_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex flex-row gap-2 items-center">
+                          <button onClick={() => setPreviewNews(item)} className="btn btn-xs btn-ghost text-blue-600" title="Xem trước"><IconEye className="w-5 h-5" /></button>
+                          <button onClick={() => window.location.href = `/news/${item.id}/edit`} className="btn btn-xs btn-ghost text-green-600" title="Chỉnh sửa"><IconEdit className="w-5 h-5" /></button>
+                          {/* Dropdown thao tác mở rộng */}
+                          <div className="relative">
+                            <button
+                              className="btn btn-xs btn-ghost text-gray-600"
+                              title="Thao tác khác"
+                              onClick={() => setOpenDropdownId(openDropdownId === item.id ? null : item.id)}
+                            >
+                              <IconMore className="w-5 h-5" />
+                            </button>
+                            {openDropdownId === item.id && (
+                              <>
+                                {/* Overlay nhỏ để bắt sự kiện click ngoài, chỉ hiện khi dropdown mở */}
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => setOpenDropdownId(null)}
+                                  aria-label="Đóng dropdown"
+                                />
+                                <div className="absolute left-full top-0 ml-2 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-50 animate-popupIn">
+                                  {item.status === 'draft' && (
+                                    <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-100" onClick={() => { handlePublish(item.id); setOpenDropdownId(null); }}><IconCalendar className="w-4 h-4 mr-2" />Xuất bản</button>
+                                  )}
+                                  {item.status === 'archived' && (
+                                    <>
+                                      <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-100" onClick={() => { handlePublish(item.id); setOpenDropdownId(null); }}><IconCalendar className="w-4 h-4 mr-2" />Xuất bản</button>
+                                      <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-100" onClick={() => { handleDraft(item.id); setOpenDropdownId(null); }}><IconArchive className="w-4 h-4 mr-2" />Bản nháp</button>
+                                    </>
+                                  )}
+                                  <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-100" onClick={() => { handleDuplicate(item.id); setOpenDropdownId(null); }}><IconCopy className="w-4 h-4 mr-2" />Sao chép</button>
+                                  {(item.status === 'draft' || item.status === 'published') && (
+                                    <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-100" onClick={() => { handleArchive(item.id); setOpenDropdownId(null); }}><IconArchive className="w-4 h-4 mr-2" />Lưu trữ</button>
+                                  )}
+                                  <button className="flex items-center w-full px-4 py-2 hover:bg-red-50 dark:hover:bg-red-900 text-red-600 dark:text-red-300" onClick={() => { handleDelete(item.id); setOpenDropdownId(null); }}><IconTrash className="w-4 h-4 mr-2" />Xoá</button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 } 
