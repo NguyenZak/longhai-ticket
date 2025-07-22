@@ -253,7 +253,7 @@ class EventController extends Controller
             // Ensure unique slug
             $counter = 1;
             $originalSlug = $data['slug'];
-            while (Event::where('slug', $data['slug'])->where('id', '!=', $id)->exists()) {
+            while (\App\Models\Event::where('slug', $data['slug'])->where('id', '!=', $id)->exists()) {
                 $data['slug'] = $originalSlug . '-' . $counter;
                 $counter++;
             }
