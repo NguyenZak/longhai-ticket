@@ -12,6 +12,7 @@ import IconX from '@/components/icon/icon-x';
 import { Transition, Dialog, TransitionChild, DialogPanel } from '@headlessui/react';
 import React, { Fragment, useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
+import axios from 'axios';
 
 const ComponentsAppsContacts = () => {
     const [addContactModal, setAddContactModal] = useState<any>(false);
@@ -34,158 +35,42 @@ const ComponentsAppsContacts = () => {
     };
 
     const [search, setSearch] = useState<any>('');
-    const [contactList] = useState<any>([
-        {
-            id: 1,
-            path: 'profile-35.png',
-            name: 'Alan Green',
-            role: 'Web Developer',
-            email: 'alan@mail.com',
-            location: 'Boston, USA',
-            phone: '+1 202 555 0197',
-            posts: 25,
-            followers: '5K',
-            following: 500,
-        },
-        {
-            id: 2,
-            path: 'profile-35.png',
-            name: 'Linda Nelson',
-            role: 'Web Designer',
-            email: 'linda@mail.com',
-            location: 'Sydney, Australia',
-            phone: '+1 202 555 0170',
-            posts: 25,
-            followers: '21.5K',
-            following: 350,
-        },
-        {
-            id: 3,
-            path: 'profile-35.png',
-            name: 'Lila Perry',
-            role: 'UX/UI Designer',
-            email: 'lila@mail.com',
-            location: 'Miami, USA',
-            phone: '+1 202 555 0105',
-            posts: 20,
-            followers: '21.5K',
-            following: 350,
-        },
-        {
-            id: 4,
-            path: 'profile-35.png',
-            name: 'Andy King',
-            role: 'Project Lead',
-            email: 'andy@mail.com',
-            location: 'Tokyo, Japan',
-            phone: '+1 202 555 0194',
-            posts: 25,
-            followers: '21.5K',
-            following: 300,
-        },
-        {
-            id: 5,
-            path: 'profile-35.png',
-            name: 'Jesse Cory',
-            role: 'Web Developer',
-            email: 'jesse@mail.com',
-            location: 'Edinburgh, UK',
-            phone: '+1 202 555 0161',
-            posts: 30,
-            followers: '20K',
-            following: 350,
-        },
-        {
-            id: 6,
-            path: 'profile-35.png',
-            name: 'Xavier',
-            role: 'UX/UI Designer',
-            email: 'xavier@mail.com',
-            location: 'New York, USA',
-            phone: '+1 202 555 0155',
-            posts: 25,
-            followers: '21.5K',
-            following: 350,
-        },
-        {
-            id: 7,
-            path: 'profile-35.png',
-            name: 'Susan',
-            role: 'Project Manager',
-            email: 'susan@mail.com',
-            location: 'Miami, USA',
-            phone: '+1 202 555 0118',
-            posts: 40,
-            followers: '21.5K',
-            following: 350,
-        },
-        {
-            id: 8,
-            path: 'profile-35.png',
-            name: 'Raci Lopez',
-            role: 'Web Developer',
-            email: 'traci@mail.com',
-            location: 'Edinburgh, UK',
-            phone: '+1 202 555 0135',
-            posts: 25,
-            followers: '21.5K',
-            following: 350,
-        },
-        {
-            id: 9,
-            path: 'profile-35.png',
-            name: 'Steven Mendoza',
-            role: 'HR',
-            email: 'sokol@verizon.net',
-            location: 'Monrovia, US',
-            phone: '+1 202 555 0100',
-            posts: 40,
-            followers: '21.8K',
-            following: 300,
-        },
-        {
-            id: 10,
-            path: 'profile-35.png',
-            name: 'James Cantrell',
-            role: 'Web Developer',
-            email: 'sravani@comcast.net',
-            location: 'Michigan, US',
-            phone: '+1 202 555 0134',
-            posts: 100,
-            followers: '28K',
-            following: 520,
-        },
-        {
-            id: 11,
-            path: 'profile-35.png',
-            name: 'Reginald Brown',
-            role: 'Web Designer',
-            email: 'drhyde@gmail.com',
-            location: 'Entrimo, Spain',
-            phone: '+1 202 555 0153',
-            posts: 35,
-            followers: '25K',
-            following: 500,
-        },
-        {
-            id: 12,
-            path: 'profile-35.png',
-            name: 'Stacey Smith',
-            role: 'Chief technology officer',
-            email: 'maikelnai@optonline.net',
-            location: 'Lublin, Poland',
-            phone: '+1 202 555 0115',
-            posts: 21,
-            followers: '5K',
-            following: 200,
-        },
-    ]);
+    const [contacts, setContacts] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
 
-    const [filteredItems, setFilteredItems] = useState<any>(contactList);
+    const fetchContacts = async () => {
+        setLoading(true);
+        try {
+            const res = await axios.get(`${apiUrl}/api/contacts`);
+            setContacts(res.data.data);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchContacts();
+    }, []);
+
+    const updateStatus = async (id: number, status: string) => {
+        setLoading(true);
+        try {
+            await axios.put(`${apiUrl}/api/contacts/${id}`, { status });
+            showMessage('Cập nhật trạng thái thành công', 'success');
+            fetchContacts();
+        } catch {
+            showMessage('Lỗi cập nhật trạng thái', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const [filteredItems, setFilteredItems] = useState<any>(contacts);
 
     const searchContact = () => {
         setFilteredItems(() => {
-            return contactList.filter((item: any) => {
+            return contacts.filter((item: any) => {
                 return item.name.toLowerCase().includes(search.toLowerCase());
             });
         });
@@ -316,6 +201,9 @@ const ComponentsAppsContacts = () => {
                                     <th>Email</th>
                                     <th>Location</th>
                                     <th>Phone</th>
+                                    <th>Chủ đề</th>
+                                    <th>Nội dung</th>
+                                    <th>Trạng thái</th>
                                     <th className="!text-center">Actions</th>
                                 </tr>
                             </thead>
@@ -344,6 +232,15 @@ const ComponentsAppsContacts = () => {
                                             <td>{contact.email}</td>
                                             <td className="whitespace-nowrap">{contact.location}</td>
                                             <td className="whitespace-nowrap">{contact.phone}</td>
+                                            <td>{contact.subject}</td>
+                                            <td>{contact.message}</td>
+                                            <td>
+                                                <select value={contact.status} onChange={e => updateStatus(contact.id, e.target.value)} className="form-select">
+                                                    <option value="chua_xu_ly">Chưa xử lý</option>
+                                                    <option value="dang_xu_ly">Đang xử lý</option>
+                                                    <option value="da_xu_ly">Đã xử lý</option>
+                                                </select>
+                                            </td>
                                             <td>
                                                 <div className="flex items-center justify-center gap-4">
                                                     <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => editUser(contact)}>

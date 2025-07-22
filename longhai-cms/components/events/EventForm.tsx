@@ -332,6 +332,13 @@ const EventForm: React.FC<EventFormProps> = ({ event, onClose, onSuccess }) => {
       }
       console.log('Time after validation:', submitData.time);
       
+      // Đảm bảo luôn gửi trường price là số, mặc định 0 nếu không hợp lệ
+      // if (!submitData.price || isNaN(Number(submitData.price))) {
+      //   submitData.price = 0;
+      // } else {
+      //   submitData.price = Number(submitData.price);
+      // }
+      
       console.log('📤 Final submitData:', submitData);
 
       if (event?.id) {

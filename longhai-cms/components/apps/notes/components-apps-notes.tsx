@@ -18,210 +18,15 @@ import { Transition, Dialog, DialogPanel, TransitionChild } from '@headlessui/re
 import React, { Fragment, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import Swal from 'sweetalert2';
+import { apiCall } from '@/lib/api';
 
 const ComponentsAppsNotes = () => {
-    const [notesList, setNoteList] = useState([
-        {
-            id: 1,
-            user: 'Max Smith',
-            thumb: 'profile-16.jpeg',
-            title: 'Meeting with Kelly',
-            description: 'Curabitur facilisis vel elit sed dapibus sodales purus rhoncus.',
-            date: '11/01/2020',
-            isFav: false,
-            tag: 'personal',
-        },
-        {
-            id: 2,
-            user: 'John Doe',
-            thumb: 'profile-14.jpeg',
-            title: 'Receive Package',
-            description: 'Facilisis curabitur facilisis vel elit sed dapibus sodales purus.',
-            date: '11/02/2020',
-            isFav: true,
-            tag: '',
-        },
-        {
-            id: 3,
-            user: 'Kia Jain',
-            thumb: 'profile-15.jpeg',
-            title: 'Download Docs',
-            description: 'Proin a dui malesuada, laoreet mi vel, imperdiet diam quam laoreet.',
-            date: '11/04/2020',
-            isFav: false,
-            tag: 'work',
-        },
-        {
-            id: 4,
-            user: 'Max Smith',
-            thumb: 'profile-16.jpeg',
-            title: 'Meeting at 4:50pm',
-            description: 'Excepteur sint occaecat cupidatat non proident, anim id est laborum.',
-            date: '11/08/2020',
-            isFav: false,
-            tag: '',
-        },
-        {
-            id: 5,
-            user: 'Karena Courtliff',
-            thumb: 'profile-17.jpeg',
-            title: 'Backup Files EOD',
-            description: 'Maecenas condimentum neque mollis, egestas leo ut, gravida.',
-            date: '11/09/2020',
-            isFav: false,
-            tag: '',
-        },
-        {
-            id: 6,
-            user: 'Max Smith',
-            thumb: 'profile-16.jpeg',
-            title: 'Download Server Logs',
-            description: 'Suspendisse efficitur diam quis gravida. Nunc molestie est eros.',
-            date: '11/09/2020',
-            isFav: false,
-            tag: 'social',
-        },
-        {
-            id: 7,
-            user: 'Vladamir Koschek',
-            thumb: '',
-            title: 'Team meet at Starbucks',
-            description: 'Etiam a odio eget enim aliquet laoreet lobortis sed ornare nibh.',
-            date: '11/10/2020',
-            isFav: false,
-            tag: '',
-        },
-        {
-            id: 8,
-            user: 'Max Smith',
-            thumb: 'profile-16.jpeg',
-            title: 'Create new users Profile',
-            description: 'Duis aute irure in nulla pariatur. Etiam a odio eget enim aliquet.',
-            date: '11/11/2020',
-            isFav: false,
-            tag: 'important',
-        },
-        {
-            id: 9,
-            user: 'Robert Garcia',
-            thumb: 'profile-21.jpeg',
-            title: 'Create a compost pile',
-            description: 'Zombie ipsum reversus ab viral inferno, nam rick grimes malum cerebro.',
-            date: '11/12/2020',
-            isFav: true,
-            tag: '',
-        },
-        {
-            id: 10,
-            user: 'Marie Hamilton',
-            thumb: 'profile-2.jpeg',
-            title: 'Take a hike at a local park',
-            description: 'De carne lumbering animata corpora quaeritis. Summus brains sit',
-            date: '11/13/2020',
-            isFav: true,
-            tag: '',
-        },
-        {
-            id: 11,
-            user: 'Megan Meyers',
-            thumb: 'profile-1.jpeg',
-            title: 'Take a class at local community center that interests you',
-            description: 'Cupcake ipsum dolor. Sit amet marshmallow topping cheesecake muffin.',
-            date: '11/13/2020',
-            isFav: false,
-            tag: '',
-        },
-        {
-            id: 12,
-            user: 'Angela Hull',
-            thumb: 'profile-22.jpeg',
-            title: 'Research a topic interested in',
-            description: 'Lemon drops tootsie roll marshmallow halvah carrot cake.',
-            date: '11/14/2020',
-            isFav: false,
-            tag: '',
-        },
-        {
-            id: 13,
-            user: 'Karen Wolf',
-            thumb: 'profile-23.jpeg',
-            title: 'Plan a trip to another country',
-            description: 'Space, the final frontier. These are the voyages of the Starship Enterprise.',
-            date: '11/16/2020',
-            isFav: true,
-            tag: '',
-        },
-        {
-            id: 14,
-            user: 'Jasmine Barnes',
-            thumb: 'profile-1.jpeg',
-            title: 'Improve touch typing',
-            description: 'Well, the way they make shows is, they make one show.',
-            date: '11/16/2020',
-            isFav: false,
-            tag: '',
-        },
-        {
-            id: 15,
-            user: 'Thomas Cox',
-            thumb: 'profile-11.jpeg',
-            title: 'Learn Express.js',
-            description: 'Bulbasaur Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-            date: '11/17/2020',
-            isFav: false,
-            tag: 'work',
-        },
-        {
-            id: 16,
-            user: 'Marcus Jones',
-            thumb: 'profile-12.jpeg',
-            title: 'Learn calligraphy',
-            description: 'Ivysaur Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-            date: '11/17/2020',
-            isFav: false,
-            tag: '',
-        },
-        {
-            id: 17,
-            user: 'Matthew Gray',
-            thumb: 'profile-24.jpeg',
-            title: 'Have a photo session with some friends',
-            description: 'Venusaur Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-            date: '11/18/2020',
-            isFav: false,
-            tag: 'important',
-        },
-        {
-            id: 18,
-            user: 'Chad Davis',
-            thumb: 'profile-31.jpeg',
-            title: 'Go to the gym',
-            description: 'Charmander Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-            date: '11/18/2020',
-            isFav: false,
-            tag: '',
-        },
-        {
-            id: 19,
-            user: 'Linda Drake',
-            thumb: 'profile-23.jpeg',
-            title: 'Make own LEGO creation',
-            description: 'Charmeleon Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-            date: '11/18/2020',
-            isFav: false,
-            tag: 'social',
-        },
-        {
-            id: 20,
-            user: 'Kathleen Flores',
-            thumb: 'profile-34.jpeg',
-            title: 'Take cat on a walk',
-            description: 'Baseball ipsum dolor sit amet cellar rubber win hack tossed. ',
-            date: '11/18/2020',
-            isFav: false,
-            tag: 'personal',
-        },
-    ]);
+    const [notes, setNotes] = useState<any[]>([]);
+    const fetchNotes = async () => {
+        const res = await apiCall('/notes');
+        setNotes(res.data || []);
+    };
+    useEffect(() => { fetchNotes(); }, []);
 
     const defaultParams = {
         id: null,
@@ -243,51 +48,29 @@ const ComponentsAppsNotes = () => {
     const searchNotes = () => {
         if (selectedTab !== 'fav') {
             if (selectedTab !== 'all' || selectedTab === 'delete') {
-                setFilterdNotesList(notesList.filter((d) => d.tag === selectedTab));
+                setFilterdNotesList(notes.filter((d) => d.tag === selectedTab));
             } else {
-                setFilterdNotesList(notesList);
+                setFilterdNotesList(notes);
             }
         } else {
-            setFilterdNotesList(notesList.filter((d) => d.isFav));
+            setFilterdNotesList(notes.filter((d) => d.is_fav));
         }
     };
 
-    const saveNote = () => {
+    const saveNote = async () => {
         if (!params.title) {
             showMessage('Title is required.', 'error');
             return false;
         }
         if (params.id) {
             //update task
-            let note: any = notesList.find((d: any) => d.id === params.id);
-            note.title = params.title;
-            note.user = params.user;
-            note.description = params.description;
-            note.tag = params.tag;
+            await apiCall(`/notes/${params.id}`, { method: 'PUT', body: JSON.stringify(params) });
         } else {
-            //add note
-            let maxNoteId = notesList.reduce((max: any, character: any) => (character.id > max ? character.id : max), notesList[0].id);
-            if (!maxNoteId) {
-                maxNoteId = 0;
-            }
-            let dt = new Date();
-            let note = {
-                id: maxNoteId + 1,
-                title: params.title,
-                user: params.user,
-                thumb: 'profile-21.jpeg',
-                description: params.description,
-                date: dt.getDate() + '/' + Number(dt.getMonth()) + 1 + '/' + dt.getFullYear(),
-                isFav: false,
-                tag: params.tag,
-            };
-
-            notesList.splice(0, 0, note);
-            searchNotes();
+            await apiCall('/notes', { method: 'POST', body: JSON.stringify(params) });
         }
         showMessage('Note has been saved successfully.');
         setAddContactModal(false);
-        searchNotes();
+        fetchNotes();
     };
 
     const tabChanged = (type: string) => {
@@ -296,25 +79,14 @@ const ComponentsAppsNotes = () => {
         searchNotes();
     };
 
-    const setFav = (note: any) => {
-        let list = filterdNotesList;
-        let item = list.find((d: any) => d.id === note.id);
-        item.isFav = !item.isFav;
-
-        setFilterdNotesList([...list]);
-        if (selectedTab !== 'all' || selectedTab === 'delete') {
-            searchNotes();
-        }
+    const setFav = async (note: any) => {
+        await apiCall(`/notes/${note.id}/toggle-fav`, { method: 'POST' });
+        fetchNotes();
     };
 
-    const setTag = (note: any, name: string = '') => {
-        let list = filterdNotesList;
-        let item = filterdNotesList.find((d: any) => d.id === note.id);
-        item.tag = name;
-        setFilterdNotesList([...list]);
-        if (selectedTab !== 'all' || selectedTab === 'delete') {
-            searchNotes();
-        }
+    const setTag = async (note: any, name: string = '') => {
+        await apiCall(`/notes/${note.id}`, { method: 'PUT', body: JSON.stringify({ ...note, tag: name }) });
+        fetchNotes();
     };
 
     const changeValue = (e: any) => {
@@ -343,11 +115,11 @@ const ComponentsAppsNotes = () => {
         setAddContactModal(true);
     };
 
-    const deleteNote = () => {
-        setNoteList(notesList.filter((d: any) => d.id !== deletedNote.id));
-        searchNotes();
+    const deleteNote = async () => {
+        await apiCall(`/notes/${deletedNote.id}`, { method: 'DELETE' });
         showMessage('Note has been deleted successfully.');
         setIsDeleteNoteModal(false);
+        fetchNotes();
     };
 
     const showMessage = (msg = '', type = 'success') => {
@@ -367,7 +139,7 @@ const ComponentsAppsNotes = () => {
 
     useEffect(() => {
         searchNotes();
-    }, [selectedTab, notesList]);
+    }, [selectedTab, notes]);
 
     const isRtl = useSelector((state: IRootState) => state.themeConfig.rtlClass) === 'rtl';
 
@@ -635,7 +407,7 @@ const ComponentsAppsNotes = () => {
                                                             <IconTrashLines />
                                                         </button>
                                                         <button type="button" className="group text-warning ltr:ml-2 rtl:mr-2" onClick={() => setFav(note)}>
-                                                            <IconStar className={`h-4.5 w-4.5 group-hover:fill-warning ${note.isFav && 'fill-warning'}`} />
+                                                            <IconStar className={`h-4.5 w-4.5 group-hover:fill-warning ${note.is_fav ? 'fill-warning' : ''}`} />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -856,7 +628,7 @@ const ComponentsAppsNotes = () => {
                                                         {params.tag}
                                                     </button>
                                                 )}
-                                                {params.isFav && (
+                                                {params.is_fav && (
                                                     <button type="button" className="text-warning">
                                                         <IconStar className="fill-warning" />
                                                     </button>

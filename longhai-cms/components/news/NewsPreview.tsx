@@ -115,9 +115,12 @@ export default function NewsPreview({ news, onClose }: NewsPreviewProps) {
               <h3 className="text-lg font-semibold mb-2">Tags:</h3>
               <div className="flex flex-wrap gap-2">
                 {news.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary">
+                  <span
+                    key={tag}
+                    className="inline-block bg-green-50 text-green-700 text-xs rounded-2xl px-2 py-0.5 border border-green-200 font-medium"
+                  >
                     #{tag}
-                  </Badge>
+                  </span>
                 ))}
               </div>
             </div>

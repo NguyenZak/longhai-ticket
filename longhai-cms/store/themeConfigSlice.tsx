@@ -13,6 +13,7 @@ const initialState = {
     locale: themeConfig.locale,
     semidark: themeConfig.semidark,
     languageList: [
+        { code: 'vi', name: 'Vietnamese' },
         { code: 'zh', name: 'Chinese' },
         { code: 'da', name: 'Danish' },
         { code: 'en', name: 'English' },

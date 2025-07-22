@@ -50,7 +50,6 @@ class EventController extends Controller
             'end_date' => 'required|date|after:start_date',
             'time' => 'nullable|date_format:H:i',
             'total_seats' => 'required|integer|min:1',
-            'price' => 'required|numeric|min:0',
             'price_display' => 'nullable|string|max:255',
             'min_price' => 'nullable|numeric|min:0',
             'max_price' => 'nullable|numeric|min:0|gte:min_price',
@@ -92,11 +91,6 @@ class EventController extends Controller
                 $end .= ':00';
             }
             $data['end_date'] = \Carbon\Carbon::parse($end)->format('Y-m-d H:i:s');
-        }
-        
-        // Format price to 2 decimal places
-        if (isset($data['price'])) {
-            $data['price'] = number_format((float)$data['price'], 2, '.', '');
         }
         
         // Format min_price and max_price to 2 decimal places
@@ -182,7 +176,6 @@ class EventController extends Controller
             'end_date' => 'required|date|after:start_date',
             'time' => 'nullable|date_format:H:i',
             'total_seats' => 'required|integer|min:1',
-            'price' => 'required|numeric|min:0',
             'price_display' => 'nullable|string|max:255',
             'min_price' => 'nullable|numeric|min:0',
             'max_price' => 'nullable|numeric|min:0|gte:min_price',
@@ -228,11 +221,6 @@ class EventController extends Controller
                 $end .= ':00';
             }
             $data['end_date'] = \Carbon\Carbon::parse($end)->format('Y-m-d H:i:s');
-        }
-        
-        // Format price to 2 decimal places
-        if (isset($data['price'])) {
-            $data['price'] = number_format((float)$data['price'], 2, '.', '');
         }
         
         // Format min_price and max_price to 2 decimal places

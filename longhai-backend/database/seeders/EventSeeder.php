@@ -2,156 +2,64 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Models\Event;
-use App\Models\Ticket;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class EventSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // Xoá toàn bộ event trước khi seed lại
-        \App\Models\Event::truncate();
-
-        Event::create([
-            'title' => 'Hoàng Dũng Concert 2024',
-            'slug' => 'hoang-dung-concert-2024',
-            'description' => 'Đêm nhạc đặc biệt với ca sĩ Hoàng Dũng - một trong những giọng ca nam hàng đầu Việt Nam. Chương trình sẽ mang đến những ca khúc hit nhất của anh cùng những màn trình diễn đặc sắc.',
-            'venue' => 'Nhà hát Hòa Bình',
-            'location_detail' => '240 Ba Tháng Hai, Quận 10, TP.HCM',
-            'start_date' => '2024-12-25 19:30:00',
-            'end_date' => '2024-12-25 22:30:00',
-            'time' => '19:30',
-            'status' => 'active',
-            'display_status' => 'Đang mở bán',
-            'total_seats' => 1000,
-            'available_seats' => 850,
-            'price' => 500000.00,
-            'price_display' => 'Từ 500.000đ',
-            'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/landscape-panorama',
-            'map_image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/architecture-signs',
-            'artists' => [
-                [
-                    'name' => 'Hoàng Dũng',
-                    'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/people/boy-snow-hoodie'
-                ],
-                [
-                    'name' => 'Vũ Cát Tường',
-                    'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/people/girl-north'
-                ]
+        DB::table('events')->insert([
+            [
+                'title' => 'Hội chợ Công nghệ 2025',
+                'slug' => Str::slug('Hội chợ Công nghệ 2025'),
+                'venue' => 'Trung tâm Hội nghị Quốc gia',
+                'start_date' => Carbon::now()->addDays(10),
+                'end_date' => Carbon::now()->addDays(12),
+                'description' => 'Sự kiện công nghệ lớn nhất năm 2025.',
+                'banner' => null,
+                'status' => 'confirmed',
+                'min_price' => 100000,
+                'max_price' => 500000,
+                'price_range_display' => '100.000 - 500.000 VNĐ',
+                'price_display' => 'Từ 100.000 VNĐ',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
-            'ticket_prices' => [
-                [
-                    'name' => 'VIP',
-                    'price' => 1200000.00
-                ],
-                [
-                    'name' => 'A',
-                    'price' => 800000.00
-                ],
-                [
-                    'name' => 'B',
-                    'price' => 500000.00
-                ],
-                [
-                    'name' => 'C',
-                    'price' => 300000.00
-                ]
-            ]
-        ]);
-
-        Event::create([
-            'title' => 'Sơn Tùng M-TP Live Concert',
-            'slug' => 'son-tung-mtp-live-concert',
-            'description' => 'Sự kiện âm nhạc lớn nhất năm với sự xuất hiện của ca sĩ Sơn Tùng M-TP. Chương trình sẽ mang đến những màn trình diễn hoành tráng với công nghệ hiện đại.',
-            'venue' => 'Sân vận động Quân khu 7',
-            'location_detail' => '202 Hoàng Văn Thụ, Quận Tân Bình, TP.HCM',
-            'start_date' => '2024-11-15 20:00:00',
-            'end_date' => '2024-11-15 23:00:00',
-            'time' => '20:00',
-            'status' => 'preparing',
-            'display_status' => 'Sắp mở bán',
-            'total_seats' => 5000,
-            'available_seats' => 5000,
-            'price' => 800000.00,
-            'price_display' => 'Từ 800.000đ',
-            'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/beach-boat',
-            'map_image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/architecture-signs',
-            'artists' => [
-                [
-                    'name' => 'Sơn Tùng M-TP',
-                    'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/people/boy-snow-hoodie'
-                ]
+            [
+                'title' => 'Live Concert Summer',
+                'slug' => Str::slug('Live Concert Summer'),
+                'venue' => 'Sân vận động Mỹ Đình',
+                'start_date' => Carbon::now()->addDays(20),
+                'end_date' => Carbon::now()->addDays(20),
+                'description' => 'Đêm nhạc hội mùa hè với nhiều nghệ sĩ nổi tiếng.',
+                'banner' => null,
+                'status' => 'pending',
+                'min_price' => 200000,
+                'max_price' => 1000000,
+                'price_range_display' => '200.000 - 1.000.000 VNĐ',
+                'price_display' => 'Từ 200.000 VNĐ',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
-            'ticket_prices' => [
-                [
-                    'name' => 'VIP',
-                    'price' => 2500000.00
-                ],
-                [
-                    'name' => 'A',
-                    'price' => 1500000.00
-                ],
-                [
-                    'name' => 'B',
-                    'price' => 800000.00
-                ],
-                [
-                    'name' => 'C',
-                    'price' => 500000.00
-                ]
-            ]
-        ]);
-
-        Event::create([
-            'title' => 'Jazz Night với Trần Mạnh Tuấn',
-            'slug' => 'jazz-night-tran-manh-tuan',
-            'description' => 'Đêm nhạc Jazz đặc biệt với nghệ sĩ saxophone Trần Mạnh Tuấn. Một không gian âm nhạc sang trọng và ấm cúng dành cho những người yêu nhạc Jazz.',
-            'venue' => 'Landmark 81',
-            'location_detail' => 'Vinhomes Central Park, Quận Bình Thạnh, TP.HCM',
-            'start_date' => '2024-10-20 19:00:00',
-            'end_date' => '2024-10-20 21:30:00',
-            'time' => '19:00',
-            'status' => 'ended',
-            'display_status' => 'Đã kết thúc',
-            'total_seats' => 300,
-            'available_seats' => 0,
-            'price' => 1200000.00,
-            'price_display' => '1.200.000đ',
-            'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/mountain-lake',
-            'map_image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/landscapes/architecture-signs',
-            'artists' => [
-                [
-                    'name' => 'Trần Mạnh Tuấn',
-                    'image' => 'https://res.cloudinary.com/demo/image/upload/v1/samples/people/boy-snow-hoodie'
-                ]
+            [
+                'title' => 'Hội thảo Khởi nghiệp',
+                'slug' => Str::slug('Hội thảo Khởi nghiệp'),
+                'venue' => 'Đại học Bách Khoa',
+                'start_date' => Carbon::now()->addDays(30),
+                'end_date' => Carbon::now()->addDays(31),
+                'description' => 'Chia sẻ kinh nghiệm khởi nghiệp cùng các chuyên gia.',
+                'banner' => null,
+                'status' => 'completed',
+                'min_price' => 0,
+                'max_price' => 0,
+                'price_range_display' => 'Miễn phí',
+                'price_display' => 'Miễn phí',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
-            'ticket_prices' => [
-                [
-                    'name' => 'VIP',
-                    'price' => 1200000.00
-                ],
-                [
-                    'name' => 'Standard',
-                    'price' => 800000.00
-                ]
-            ]
         ]);
-
-        // Đồng bộ display_status cho tất cả event
-        $map = [
-            'preparing' => 'Sắp mở bán',
-            'active' => 'Đang mở bán',
-            'ended' => 'Đã kết thúc',
-        ];
-        foreach (Event::all() as $event) {
-            $event->display_status = $map[$event->status] ?? null;
-            $event->save();
-        }
     }
 }

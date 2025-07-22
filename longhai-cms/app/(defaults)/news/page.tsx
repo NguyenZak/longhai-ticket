@@ -21,7 +21,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from '@/components/ui/dialog';
-import { Toast } from '@/components/ui/toast';
+import Swal from 'sweetalert2';
 import NewsForm from '@/components/news/NewsForm';
 import NewsPreview from '@/components/news/NewsPreview';
 import IconEye from '@/components/icon/icon-eye';
@@ -32,7 +32,12 @@ import IconStar from '@/components/icon/icon-star';
 import IconCalendar from '@/components/icon/icon-calendar';
 import IconArchive from '@/components/icon/icon-archive';
 import IconCopy from '@/components/icon/icon-copy';
+import IconUser from '@/components/icon/icon-user';
+import IconClock from '@/components/icon/icon-clock';
 import Link from "next/link";
+import axios from 'axios';
+import ComponentsDatatablesAdvanced from '../../../components/datatables/components-datatables-advanced';
+import '../../../styles/datatables.css';
 
 interface News {
   id: number;
@@ -65,14 +70,30 @@ export default function NewsPage() {
   const [previewNews, setPreviewNews] = useState<News | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const [categoryOptions, setCategoryOptions] = useState<{id:number, name:string, slug:string, type:string}[]>([]);
 
   useEffect(() => {
     fetchNews();
+    // Lấy danh sách category từ API
+    axios.get((process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000") + '/api/categories?type=news')
+      .then(res => setCategoryOptions(res.data.data || []))
+      .catch(() => setCategoryOptions([]));
   }, []);
 
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 3000);
+  // Hàm showMessage giống Note
+  const showMessage = (msg = '', type = 'success') => {
+    const toast: any = Swal.mixin({
+      toast: true,
+      position: 'top',
+      showConfirmButton: false,
+      timer: 3000,
+      customClass: { container: 'toast' },
+    });
+    toast.fire({
+      icon: type,
+      title: msg,
+      padding: '10px 20px',
+    });
   };
 
   const fetchNews = async () => {
@@ -82,29 +103,38 @@ export default function NewsPage() {
       if (data.success) {
         setNews(data.data.data || data.data);
       } else {
-        showNotification('error', data.message || 'Không thể tải tin tức');
+        showMessage(data.message || 'Không thể tải tin tức', 'error');
       }
     } catch (error) {
       console.error('Error fetching news:', error);
-      showNotification('error', 'Không thể tải tin tức');
+      showMessage('Không thể tải tin tức', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa tin tức này?')) return;
+    const result = await Swal.fire({
+      title: 'Bạn có chắc chắn muốn xoá tin tức này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xoá',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+    });
+    if (!result.isConfirmed) return;
     try {
       const data = await apiCall(`/news/${id}`, { method: 'DELETE' });
       if (data.success) {
-        showNotification('success', 'Tin tức đã được xóa thành công');
+        showMessage('Tin tức đã được xóa thành công', 'success');
         fetchNews();
       } else {
-        showNotification('error', data.message || 'Không thể xóa tin tức');
+        showMessage(data.message || 'Không thể xóa tin tức', 'error');
       }
     } catch (error) {
       console.error('Error deleting news:', error);
-      showNotification('error', 'Không thể xóa tin tức');
+      showMessage('Không thể xóa tin tức', 'error');
     }
   };
 
@@ -112,14 +142,14 @@ export default function NewsPage() {
     try {
       const data = await apiCall(`/news/${id}/toggle-featured`, { method: 'POST' });
       if (data.success) {
-        showNotification('success', 'Trạng thái nổi bật đã được cập nhật');
+        showMessage('Trạng thái nổi bật đã được cập nhật', 'success');
         fetchNews();
       } else {
-        showNotification('error', data.message || 'Không thể cập nhật trạng thái nổi bật');
+        showMessage(data.message || 'Không thể cập nhật trạng thái nổi bật', 'error');
       }
     } catch (error) {
       console.error('Error toggling featured:', error);
-      showNotification('error', 'Không thể cập nhật trạng thái nổi bật');
+      showMessage('Không thể cập nhật trạng thái nổi bật', 'error');
     }
   };
 
@@ -127,14 +157,14 @@ export default function NewsPage() {
     try {
       const data = await apiCall(`/news/${id}/publish`, { method: 'POST' });
       if (data.success) {
-        showNotification('success', 'Tin tức đã được xuất bản');
+        showMessage('Tin tức đã được xuất bản', 'success');
         fetchNews();
       } else {
-        showNotification('error', data.message || 'Không thể xuất bản tin tức');
+        showMessage(data.message || 'Không thể xuất bản tin tức', 'error');
       }
     } catch (error) {
       console.error('Error publishing news:', error);
-      showNotification('error', 'Không thể xuất bản tin tức');
+      showMessage('Không thể xuất bản tin tức', 'error');
     }
   };
 
@@ -142,14 +172,14 @@ export default function NewsPage() {
     try {
       const data = await apiCall(`/news/${id}/archive`, { method: 'POST' });
       if (data.success) {
-        showNotification('success', 'Tin tức đã được lưu trữ');
+        showMessage('Tin tức đã được lưu trữ', 'success');
         fetchNews();
       } else {
-        showNotification('error', data.message || 'Không thể lưu trữ tin tức');
+        showMessage(data.message || 'Không thể lưu trữ tin tức', 'error');
       }
     } catch (error) {
       console.error('Error archiving news:', error);
-      showNotification('error', 'Không thể lưu trữ tin tức');
+      showMessage('Không thể lưu trữ tin tức', 'error');
     }
   };
 
@@ -157,14 +187,14 @@ export default function NewsPage() {
     try {
       const data = await apiCall(`/news/${id}/duplicate`, { method: 'POST' });
       if (data.success) {
-        showNotification('success', 'Tin tức đã được sao chép thành công');
+        showMessage('Tin tức đã được sao chép thành công', 'success');
         fetchNews();
       } else {
-        showNotification('error', data.message || 'Không thể sao chép tin tức');
+        showMessage(data.message || 'Không thể sao chép tin tức', 'error');
       }
     } catch (error) {
       console.error('Error duplicating news:', error);
-      showNotification('error', 'Không thể sao chép tin tức');
+      showMessage('Không thể sao chép tin tức', 'error');
     }
   };
 
@@ -192,10 +222,13 @@ export default function NewsPage() {
 
   const getCategoryBadge = (category: string) => {
     return (
-      <Badge variant="outline" className="text-xs">
-        {category}
-      </Badge>
+      <Badge variant="outline" className="text-xs rounded-2xl px-3 py-1 bg-blue-50 text-blue-700 border-blue-200 font-semibold">{category}</Badge>
     );
+  };
+
+  const getCategoryName = (slug: string) => {
+    const found = categoryOptions.find(c => c.slug === slug);
+    return found ? found.name : slug;
   };
 
   const formatDate = (dateString: string) => {
@@ -218,13 +251,7 @@ export default function NewsPage() {
   return (
     <div className="space-y-6">
       {/* Notification */}
-      {notification && (
-        <Toast
-          type={notification.type}
-          message={notification.message}
-          onClose={() => setNotification(null)}
-        />
-      )}
+      {/* Bỏ Toast component khỏi render */}
 
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -314,147 +341,16 @@ export default function NewsPage() {
       </Card>
 
       {/* News Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tiêu đề</TableHead>
-              <TableHead>Danh mục</TableHead>
-              <TableHead>Tác giả</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredNews.length > 0 ? (
-              filteredNews.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <div className="flex items-start space-x-3">
-                      {item.image && (
-                        <img 
-                          src={item.image} 
-                          alt={item.title}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <p className="font-medium truncate">{item.title}</p>
-                          {item.featured && (
-                            <span className="text-yellow-500">⭐</span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 truncate">{item.excerpt}</p>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
-                          <span>⏱️ {item.read_time} phút</span>
-                          {item.published_at && (
-                            <span>📅 {formatDate(item.published_at)}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {getCategoryBadge(item.category)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center whitespace-nowrap">
-                      👤 {item.author}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(item.status)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setPreviewNews(item)}
-                        title="Xem trước"
-                      >
-                        <IconEye className="w-5 h-5" />
-                      </Button>
-                      <Link href={`/news/${item.id}/edit`}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Chỉnh sửa"
-                        >
-                          <IconEdit className="w-5 h-5" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-600 hover:text-red-700"
-                        title="Xóa"
-                      >
-                        <IconTrash className="w-5 h-5" />
-                      </Button>
-                      {/* Nút ba chấm mở menu */}
-                      <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setMenuOpenId(item.id)}
-                          title="Thao tác khác"
-                        >
-                          <IconMore className="w-5 h-5" />
-                        </Button>
-                        {menuOpenId === item.id && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow-lg z-50">
-                            <button
-                              className="flex items-center w-full px-4 py-2 hover:bg-gray-100"
-                              onClick={() => { handleToggleFeatured(item.id); setMenuOpenId(null); }}
-                            >
-                              <IconStar className="w-4 h-4 mr-2" />
-                              {item.featured ? 'Bỏ nổi bật' : 'Đánh dấu nổi bật'}
-                            </button>
-                            {item.status === 'draft' && (
-                              <button
-                                className="flex items-center w-full px-4 py-2 hover:bg-gray-100"
-                                onClick={() => { handlePublish(item.id); setMenuOpenId(null); }}
-                              >
-                                <IconCalendar className="w-4 h-4 mr-2" />
-                                Xuất bản
-                              </button>
-                            )}
-                            {item.status === 'published' && (
-                              <button
-                                className="flex items-center w-full px-4 py-2 hover:bg-gray-100"
-                                onClick={() => { handleArchive(item.id); setMenuOpenId(null); }}
-                              >
-                                <IconArchive className="w-4 h-4 mr-2" />
-                                Lưu trữ
-                              </button>
-                            )}
-                            <button
-                              className="flex items-center w-full px-4 py-2 hover:bg-gray-100"
-                              onClick={() => { handleDuplicate(item.id); setMenuOpenId(null); }}
-                            >
-                              <IconCopy className="w-4 h-4 mr-2" />
-                              Sao chép
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
-                  <p className="text-gray-500">Không tìm thấy tin tức nào</p>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      <ComponentsDatatablesAdvanced
+        data={filteredNews}
+        onPreview={setPreviewNews}
+        onEdit={news => window.location.href = `/news/${news.id}/edit`}
+        onDelete={handleDelete}
+        onToggleFeatured={handleToggleFeatured}
+        onPublish={handlePublish}
+        onArchive={handleArchive}
+        onDuplicate={handleDuplicate}
+      />
     </div>
   );
 } 

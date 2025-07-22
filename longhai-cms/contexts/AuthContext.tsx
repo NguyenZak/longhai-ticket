@@ -108,6 +108,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // Tự động redirect về /auth/login nếu user bị set null (logout hoặc hết hạn token)
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/login');
+    }
+  }, [user, loading, router]);
+
   const handleLogout = () => {
     console.log('🔧 AuthContext: handleLogout called');
     logout();

@@ -4,9 +4,50 @@ import { useEffect, useState } from 'react';
 import sortBy from 'lodash/sortBy';
 import IconStar from '@/components/icon/icon-star';
 import ReactApexChart from 'react-apexcharts';
+import IconEdit from '@/components/icon/icon-edit';
+import IconTrash from '@/components/icon/icon-trash';
+import IconMore from '@/components/icon/icon-more';
+import IconCalendar from '@/components/icon/icon-calendar';
+import IconArchive from '@/components/icon/icon-archive';
+import IconCopy from '@/components/icon/icon-copy';
+import IconEye from '@/components/icon/icon-eye';
+import Link from 'next/link';
+import IconUser from '@/components/icon/icon-user';
 
-const ComponentsDatatablesAdvanced = () => {
-    const rowData = [
+interface News {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  image?: string;
+  author: string;
+  category: string;
+  tags: string[];
+  read_time: number;
+  featured: boolean;
+  published_at: string;
+  status: 'draft' | 'published' | 'archived';
+  meta_title?: string;
+  meta_description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Props {
+  data: News[];
+  onPreview: (news: News) => void;
+  onEdit: (news: News) => void;
+  onDelete: (id: number) => void;
+  onToggleFeatured: (id: number) => void;
+  onPublish: (id: number) => void;
+  onArchive: (id: number) => void;
+  onDuplicate: (id: number) => void;
+  onDraft?: (id: number) => void;
+}
+
+// Dữ liệu mẫu rowData
+const rowData = [
         {
             id: 1,
             firstName: 'Caroline',
@@ -509,6 +550,21 @@ const ComponentsDatatablesAdvanced = () => {
         },
     ];
 
+const ComponentsDatatablesAdvanced = (props: Partial<Props>) => {
+  const {
+    data,
+    onPreview,
+    onEdit,
+    onDelete,
+    onToggleFeatured,
+    onPublish,
+    onArchive,
+    onDuplicate,
+    onDraft,
+  } = props;
+  // Nếu không có data truyền vào thì dùng rowData mẫu
+  const tableData = data && data.length > 0 ? data : rowData;
+
     const countryList = [
         { code: 'AE', name: 'United Arab Emirates' },
         { code: 'AR', name: 'Argentina' },
@@ -596,7 +652,7 @@ const ComponentsDatatablesAdvanced = () => {
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState(sortBy(rowData, 'id'));
+    const [initialRecords, setInitialRecords] = useState(sortBy(tableData, 'id'));
     const [recordsData, setRecordsData] = useState(initialRecords);
 
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
@@ -672,9 +728,81 @@ const ComponentsDatatablesAdvanced = () => {
         return option;
     };
 
+    // Xác định kiểu dữ liệu: nếu có field 'title' thì là News
+    const isNewsData = tableData.length > 0 && typeof tableData[0] === 'object' && 'title' in tableData[0];
+
+    // Định nghĩa columns cho News
+    const newsColumns = [
+      {
+        accessor: 'title',
+        title: 'Tiêu đề',
+        render: (item: any) => (
+          <div className="flex items-center gap-2">
+            {item.image && <img src={item.image} alt={item.title} className="w-10 h-10 object-cover rounded" />}
+            <div>
+              <div className="font-semibold line-clamp-1">{item.title}</div>
+              <div className="text-xs text-gray-500 line-clamp-1">{item.excerpt}</div>
+            </div>
+            {item.featured && <IconStar className="w-4 h-4 text-yellow-400" />}
+          </div>
+        ),
+      },
+      {
+        accessor: 'category',
+        title: 'Danh mục',
+        render: (item: any) => <span className="badge badge-outline-primary">{item.category}</span>,
+      },
+      {
+        accessor: 'author',
+        title: 'Tác giả',
+        render: (item: any) => <span className="flex items-center"><IconUser className="w-4 h-4 mr-1" />{item.author}</span>,
+      },
+      {
+        accessor: 'status',
+        title: 'Trạng thái',
+        render: (item: any) => {
+          const statusMap: any = {
+            draft: { label: 'Bản nháp', className: 'badge badge-outline-secondary' },
+            published: { label: 'Đã xuất bản', className: 'badge badge-outline-success' },
+            archived: { label: 'Đã lưu trữ', className: 'badge badge-outline-warning' },
+          };
+          const s = statusMap[item.status] || { label: item.status, className: 'badge badge-outline' };
+          return <span className={s.className}>{s.label}</span>;
+        },
+      },
+      {
+        accessor: 'actions',
+        title: 'Thao tác',
+        render: (item: any) => (
+          <div className="flex items-center gap-1">
+            {onPreview && <button className="btn btn-xs btn-ghost text-blue-600" title="Xem trước" onClick={() => onPreview(item)}><IconEye className="w-5 h-5" /></button>}
+            {onEdit && <button className="btn btn-xs btn-ghost text-green-600" title="Chỉnh sửa" onClick={() => onEdit(item)}><IconEdit className="w-5 h-5" /></button>}
+            {onDelete && <button className="btn btn-xs btn-ghost text-red-600" title="Xoá" onClick={() => onDelete(item.id)}><IconTrash className="w-5 h-5" /></button>}
+            {onToggleFeatured && <button className="btn btn-xs btn-ghost text-yellow-500" title={item.featured ? 'Bỏ nổi bật' : 'Đánh dấu nổi bật'} onClick={() => onToggleFeatured(item.id)}><IconStar className={`w-5 h-5 ${item.featured ? 'fill-yellow-400' : ''}`} /></button>}
+            {/* Menu thao tác khác */}
+            <div className="relative">
+              <button className="btn btn-xs btn-ghost" title="Thao tác khác" onClick={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)}><IconMore className="w-5 h-5" /></button>
+              {menuOpenId === item.id && (
+                <div className="absolute left-full top-0 ml-2 w-48 bg-white border rounded shadow-lg z-50">
+                  {onPublish && item.status === 'draft' && <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100" onClick={() => { onPublish(item.id); setMenuOpenId(null); }}><IconCalendar className="w-4 h-4 mr-2" />Xuất bản</button>}
+                  {onPublish && item.status === 'archived' && <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100" onClick={() => { onPublish(item.id); setMenuOpenId(null); }}><IconCalendar className="w-4 h-4 mr-2" />Xuất bản</button>}
+                  {onDraft && item.status === 'archived' && <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100" onClick={() => { onDraft(item.id); setMenuOpenId(null); }}><IconArchive className="w-4 h-4 mr-2" />Bản nháp</button>}
+                  {onDuplicate && <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100" onClick={() => { onDuplicate(item.id); setMenuOpenId(null); }}><IconCopy className="w-4 h-4 mr-2" />Sao chép</button>}
+                  {onArchive && ((item.status === 'draft' || item.status === 'published')) && <button className="flex items-center w-full px-4 py-2 hover:bg-gray-100" onClick={() => { onArchive(item.id); setMenuOpenId(null); }}><IconArchive className="w-4 h-4 mr-2" />Lưu trữ</button>}
+                </div>
+              )}
+            </div>
+          </div>
+        ),
+      },
+    ];
+
+    // State cho menu thao tác
+    const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+
     return (
         <div className="panel mt-6">
-            <h5 className="mb-5 text-lg font-semibold dark:text-white-light">Advanced</h5>
+            <h5 className="mb-5 text-lg font-semibold dark:text-white-light"></h5>
             <div className="datatables">
                 {isMounted && (
                     <DataTable
@@ -682,7 +810,7 @@ const ComponentsDatatablesAdvanced = () => {
                         highlightOnHover
                         className="table-hover whitespace-nowrap"
                         records={recordsData}
-                        columns={[
+                        columns={isNewsData ? newsColumns : [
                             {
                                 accessor: 'id',
                                 title: 'ID',

@@ -1,9 +1,13 @@
 'use client';
 import React from 'react';
-import InternalChat from './InternalChat';
 
 const ComponentsAppsChat = () => {
-  return <InternalChat />;
+  return (
+    <div>
+      {/* Chat UI sẽ được code trực tiếp ở đây hoặc import component khác nếu có */}
+      <p>Chat component is under construction.</p>
+    </div>
+  );
 };
 
 export default ComponentsAppsChat;

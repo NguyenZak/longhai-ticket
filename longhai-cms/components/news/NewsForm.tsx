@@ -17,6 +17,7 @@ import IconTag from '@/components/icon/icon-tag';
 import IconImage from '@/components/icon/icon-image';
 import { apiCall } from '@/lib/api';
 import NewsPreview from './NewsPreview';
+import axios from 'axios';
 
 interface News {
   id?: number;
@@ -66,6 +67,7 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<{id:number, name:string, slug:string, type:string}[]>([]);
 
   useEffect(() => {
     if (news) {
@@ -88,6 +90,10 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
         id: news.id,
       });
     }
+    // Lấy danh sách category từ API
+    axios.get((process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000") + '/api/categories?type=news')
+      .then(res => setCategoryOptions(res.data.data || []))
+      .catch(() => setCategoryOptions([]));
   }, [news]);
 
   const handleInputChange = (field: keyof News, value: any) => {
@@ -102,15 +108,34 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
     }
   };
 
-  const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .replace(/[đĐ]/g, 'd')
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .trim();
-  };
+ // Hàm chuyển tiếng Việt có dấu sang không dấu và tạo slug
+function removeVietnameseTones(str: string) {
+  return str
+    .replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a")
+    .replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e")
+    .replace(/ì|í|ị|ỉ|ĩ/g, "i")
+    .replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o")
+    .replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u")
+    .replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y")
+    .replace(/đ/g, "d")
+    .replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A")
+    .replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E")
+    .replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I")
+    .replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O")
+    .replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U")
+    .replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y")
+    .replace(/Đ/g, "D");
+}
+function generateSlug(str: string) {
+  return removeVietnameseTones(str)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .trim();
+}
+
 
   const handleTitleChange = (title: string) => {
     handleInputChange('title', title);
@@ -204,6 +229,20 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
     'Công nghệ'
   ];
 
+  // Thêm hàm upload ảnh giống EventForm
+  const uploadNewsImage = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append('image', file);
+    // Nếu backend có endpoint riêng cho news thì dùng /upload/news-image, nếu không thì dùng /upload/event-image
+    const response = await apiCall('/upload/event-image', {
+      method: 'POST',
+      body: fd,
+      headers: {},
+    });
+    if (!response.success) throw new Error(response.message || 'Upload failed');
+    return response.data.url;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -256,18 +295,38 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
                   placeholder="Nhập nội dung tin tức..."
                   modules={{
                     toolbar: [
-                      [{ 'header': [1, 2, 3, false] }],
-                      ['bold', 'italic', 'underline', 'strike'],
-                      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                      [{ 'color': [] }, { 'background': [] }],
+                      [{ 'font': [] }],
+                      [{ 'size': ['small', false, 'large', 'huge'] }],
+                    
+                      // Header
+                      [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                    
+                      // Text styles
+                      ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'],
+                    
+                      // Lists
+                      [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                      [{ 'indent': '-1' }, { 'indent': '+1' }],
+                    
+                      // Text direction & alignment
+                      [{ 'direction': 'rtl' }],
                       [{ 'align': [] }],
-                      ['link', 'image'],
-                      ['clean'],
-                      ['code-block']
+                    
+                      // Color & background
+                      [{ 'color': [] }, { 'background': [] }],
+                    
+                      // Scripts
+                      [{ 'script': 'sub' }, { 'script': 'super' }],
+                    
+                      // Link, image, video, formula
+                      ['link', 'image', 'video', 'formula'],
+                    
+                      // Clear formatting
+                      ['clean']
                     ]
                   }}
-                  className="w-full"
-                  style={{ minHeight: 500 }}
+                  className="w-full quill-content"
+                  
                 />
               </div>
             </CardContent>
@@ -332,11 +391,16 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
               </div>
 
               <div className="flex items-center space-x-2">
-                <Switch
-                  id="featured"
-                  checked={formData.featured}
-                  onChange={(e) => handleInputChange('featured', e.target.checked)}
-                />
+                <label className="w-12 h-6 relative">
+                  <input
+                    type="checkbox"
+                    className="custom_switch absolute w-full h-full opacity-0 z-10 cursor-pointer peer"
+                    id="custom_switch_checkbox1"
+                    checked={formData.featured}
+                    onChange={e => handleInputChange('featured', e.target.checked)}
+                  />
+                  <span className="outline_checkbox bg-icon border-2 border-[#ebedf2] dark:border-white-dark block h-full rounded-full before:absolute before:left-1 before:bg-[#ebedf2] dark:before:bg-white-dark before:bottom-1 before:w-4 before:h-4 before:rounded-full before:bg-[url(/assets/images/close.svg)] before:bg-no-repeat before:bg-center peer-checked:before:left-7 peer-checked:before:bg-[url(/assets/images/checked.svg)] peer-checked:border-primary peer-checked:before:bg-primary before:transition-all before:duration-300"></span>
+                </label>
                 <Label htmlFor="featured">Đánh dấu nổi bật</Label>
               </div>
             </CardContent>
@@ -370,10 +434,8 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
                   }`}
                 >
                   <option value="">Chọn danh mục</option>
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
+                  {categoryOptions.map((cat) => (
+                    <option key={cat.id} value={cat.name}>{cat.name}</option>
                   ))}
                 </select>
                 {errors.category && <p className="text-red-500 text-sm mt-1">{errors.category}</p>}
@@ -412,18 +474,13 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       setUploading(true);
-                      const formDataUpload = new FormData();
-                      formDataUpload.append('file', file);
-                      const res = await fetch('/api/upload', {
-                        method: 'POST',
-                        body: formDataUpload,
-                      });
-                      const data = await res.json();
-                      setUploading(false);
-                      if (data.success) {
-                        handleInputChange('image', data.url);
-                      } else {
-                        alert(data.message || 'Upload thất bại');
+                      try {
+                        const url = await uploadNewsImage(file);
+                        handleInputChange('image', url);
+                      } catch (err) {
+                        alert('Upload thất bại');
+                      } finally {
+                        setUploading(false);
                       }
                     }}
                   />
@@ -467,8 +524,11 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {formData.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="flex items-center space-x-1">
-                    <span>{tag}</span>
+                  <span
+                    key={tag}
+                    className="inline-block bg-green-50 text-green-700 text-xs rounded-2xl px-2 py-0.5 border border-green-200 font-medium"
+                  >
+                    #{tag}
                     <button
                       type="button"
                       onClick={() => removeTag(tag)}
@@ -476,7 +536,7 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
                     >
                       <IconX className="w-3 h-3" />
                     </button>
-                  </Badge>
+                  </span>
                 ))}
               </div>
             </CardContent>
@@ -486,15 +546,27 @@ export default function NewsForm({ news, onSuccess }: NewsFormProps) {
 
       {/* Submit Buttons */}
       <div className="flex justify-end space-x-2">
-        <Button type="button" variant="outline" onClick={() => setShowPreview(true)}>
+        <button
+          type="button"
+          className="btn btn-outline-primary"
+          onClick={() => setShowPreview(true)}
+        >
           Preview
-        </Button>
-        <Button type="submit" disabled={loading}>
+        </button>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={loading}
+        >
           {loading ? 'Đang lưu...' : (news ? 'Cập nhật' : 'Tạo tin tức')}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => onSuccess()}>
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline-danger"
+          onClick={() => onSuccess()}
+        >
           Hủy
-        </Button>
+        </button>
       </div>
 
       {/* Preview modal */}

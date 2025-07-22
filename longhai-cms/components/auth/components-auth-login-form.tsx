@@ -3,7 +3,7 @@ import IconLockDots from '@/components/icon/icon-lock-dots';
 import IconMail from '@/components/icon/icon-mail';
 import { useRouter } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
-import { login, getToken, getUser } from '@/lib/api';
+import { login } from '@/lib/api';
 import { useAuth, broadcastAuthEvent } from '@/contexts/AuthContext';
 
 const ComponentsAuthLoginForm = () => {
@@ -17,14 +17,22 @@ const ComponentsAuthLoginForm = () => {
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
-    // Redirect to dashboard if already authenticated
+    // Redirect to dashboard if already authenticated (dựa vào AuthContext)
+    // const { isAuthenticated, loading: loadingAuth } = useAuth();
+    // useEffect(() => {
+    //     if (!loadingAuth && isAuthenticated) {
+    //         router.push('/');
+    //     }
+    // }, [isAuthenticated, loadingAuth, router]);
+
+    // Khi vào trang login, luôn xóa token/user để tránh redirect vòng lặp sau khi logout
     useEffect(() => {
-        const token = getToken();
-        const userData = getUser();
-        if (token && userData) {
-            router.push('/');
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('user');
+            document.cookie = 'token=; Max-Age=0; path=/;';
         }
-    }, [router]);
+    }, []);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;

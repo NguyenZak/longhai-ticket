@@ -4,6 +4,7 @@
     "@craftjs/utils": "^0.2.5",
     "@editorjs/editorjs": "^2.30.8",
     "@headlessui/react": "^2.2.4",
+    "axios": "^1.10.0",
     "date-fns": "^4.1.0"
   }
 }

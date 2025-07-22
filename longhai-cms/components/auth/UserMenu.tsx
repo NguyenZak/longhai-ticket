@@ -16,12 +16,13 @@ const UserMenu: React.FC = () => {
     try {
       await logoutApi();
       logout();
-      
+      setIsOpen(false);
+      // Không gọi router.push ở đây, AuthContext sẽ tự redirect
       console.log('✅ Logout successful');
-      
-      router.push('/auth/login');
     } catch (error) {
       console.error('Logout error:', error);
+      // Nếu có lỗi, fallback chuyển trang
+      router.push('/auth/login');
     } finally {
       setLoading(false);
     }

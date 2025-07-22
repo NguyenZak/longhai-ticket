@@ -3,6 +3,10 @@ import { useState, useEffect } from 'react';
 import { apiCall } from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import DateDisplay from '@/components/common/DateDisplay';
+import { DataTable, DataTableSortStatus } from 'mantine-datatable';
+import IconFile from '@/components/icon/icon-file';
+import IconPrinter from '@/components/icon/icon-printer';
+import { sortBy } from 'lodash';
 
 interface Booking {
   id: number;
@@ -34,9 +38,41 @@ const BookingsPage = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
+  const PAGE_SIZES = [10, 20, 30, 50, 100];
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const [initialRecords, setInitialRecords] = useState<Booking[]>([]);
+  const [recordsData, setRecordsData] = useState<Booking[]>([]);
+  const [search, setSearch] = useState("");
+  const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({ columnAccessor: "id", direction: "desc" });
+
   useEffect(() => {
     fetchBookings();
   }, []);
+
+  useEffect(() => { setInitialRecords(bookings); }, [bookings]);
+  useEffect(() => { setPage(1); }, [pageSize]);
+  useEffect(() => {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize;
+    setRecordsData([...initialRecords.slice(from, to)]);
+  }, [page, pageSize, initialRecords]);
+  useEffect(() => {
+    setInitialRecords(() => {
+      return bookings.filter((item) => {
+        return (
+          item.user.name.toLowerCase().includes(search.toLowerCase()) ||
+          item.user.email.toLowerCase().includes(search.toLowerCase()) ||
+          item.event.title.toLowerCase().includes(search.toLowerCase())
+        );
+      });
+    });
+  }, [search, bookings]);
+  useEffect(() => {
+    const data = sortBy(initialRecords, sortStatus.columnAccessor);
+    setInitialRecords(sortStatus.direction === "desc" ? data.reverse() : data);
+    setPage(1);
+  }, [sortStatus]);
 
   const fetchBookings = async () => {
     try {
@@ -126,6 +162,76 @@ const BookingsPage = () => {
     }
   };
 
+  const exportTable = (type: string) => {
+    let columns = ['id', 'user', 'email', 'event', 'ticket_type', 'quantity', 'total_amount', 'status', 'created_at'];
+    let records = bookings;
+    let filename = 'bookings';
+    let newVariable: any = window.navigator;
+    if (type === 'csv' || type === 'txt') {
+      let coldelimiter = type === 'csv' ? ';' : ',';
+      let linedelimiter = '\n';
+      let result = columns.map((d) => d.toUpperCase()).join(coldelimiter);
+      result += linedelimiter;
+      records.forEach((item) => {
+        result += [
+          item.id,
+          item.user.name,
+          item.user.email,
+          item.event.title,
+          item.ticket.ticket_type,
+          item.quantity,
+          item.total_amount,
+          getStatusText(item.status),
+          formatDate(item.event.start_date)
+        ].join(coldelimiter) + linedelimiter;
+      });
+      if (!result.match(/^data:text\/(csv|txt)/i) && !newVariable.msSaveOrOpenBlob) {
+        var data = `data:application/${type};charset=utf-8,` + encodeURIComponent(result);
+        var link = document.createElement('a');
+        link.setAttribute('href', data);
+        link.setAttribute('download', filename + '.' + type);
+        link.click();
+      } else {
+        var blob = new Blob([result]);
+        if (newVariable.msSaveOrOpenBlob) {
+          newVariable.msSaveBlob(blob, filename + '.' + type);
+        }
+      }
+    } else if (type === 'print') {
+      var rowhtml = '<p>' + filename + '</p>';
+      rowhtml += '<table style="width: 100%; " cellpadding="0" cellcpacing="0"><thead><tr style="color: #515365; background: #eff5ff; -webkit-print-color-adjust: exact; print-color-adjust: exact; "> ';
+      columns.forEach((d) => {
+        rowhtml += '<th>' + d.toUpperCase() + '</th>';
+      });
+      rowhtml += '</tr></thead>';
+      rowhtml += '<tbody>';
+      records.forEach((item) => {
+        rowhtml += '<tr>';
+        [
+          item.id,
+          item.user.name,
+          item.user.email,
+          item.event.title,
+          item.ticket.ticket_type,
+          item.quantity,
+          item.total_amount,
+          getStatusText(item.status),
+          formatDate(item.event.start_date)
+        ].forEach((val) => {
+          rowhtml += '<td>' + val + '</td>';
+        });
+        rowhtml += '</tr>';
+      });
+      rowhtml += '<style>body {font-family:Arial; color:#495057;}p{text-align:center;font-size:18px;font-weight:bold;margin:15px;}table{ border-collapse: collapse; border-spacing: 0; }th,td{font-size:12px;text-align:left;padding: 4px;}th{padding:8px 4px;}tr:nth-child(2n-1){background:#f7f7f7; }</style>';
+      rowhtml += '</tbody></table>';
+      var winPrint: any = window.open('', '', 'left=0,top=0,width=1000,height=600,toolbar=0,scrollbars=0,status=0');
+      winPrint.document.write('<title>Print</title>' + rowhtml);
+      winPrint.document.close();
+      winPrint.focus();
+      winPrint.print();
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -194,97 +300,53 @@ const BookingsPage = () => {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.length === bookings.length && bookings.length > 0}
-                    onChange={handleSelectAll}
-                  />
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Sự kiện
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Người đặt
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Loại vé
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Số lượng
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Tổng tiền
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Trạng thái
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {bookings.map((booking) => (
-                <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-4 py-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(booking.id)}
-                      onChange={() => handleSelect(booking.id)}
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {booking.event.title}
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {booking.event.venue} • <DateDisplay date={booking.event.start_date} showTime={false} />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {booking.user.name}
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {booking.user.email}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {booking.ticket.ticket_type}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {booking.quantity}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {formatCurrency(booking.total_amount)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(booking.status)}`}>
-                      {getStatusText(booking.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleDelete(booking.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Xoá
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="panel mt-6">
+        <div className="mb-4.5 flex flex-col justify-between gap-5 md:flex-row md:items-center">
+          <div className="flex flex-wrap items-center">
+            <button type="button" onClick={() => exportTable('csv')} className="btn btn-primary btn-sm m-1 ">
+              <IconFile className="h-5 w-5 ltr:mr-2 rtl:ml-2" />
+              CSV
+            </button>
+            <button type="button" onClick={() => exportTable('txt')} className="btn btn-primary btn-sm m-1">
+              <IconFile className="h-5 w-5 ltr:mr-2 rtl:ml-2" />
+              TXT
+            </button>
+            <button type="button" onClick={() => exportTable('print')} className="btn btn-primary btn-sm m-1">
+              <IconPrinter className="ltr:mr-2 rtl:ml-2" />
+              PRINT
+            </button>
+          </div>
+          <input type="text" className="form-input w-auto" placeholder="Tìm kiếm..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="datatables">
+          <DataTable
+            highlightOnHover
+            className="table-hover whitespace-nowrap"
+            records={recordsData}
+            columns={[
+              { accessor: 'id', title: '#', sortable: true },
+              { accessor: 'user', title: 'Khách hàng', sortable: true, render: ({ user }) => user.name },
+              { accessor: 'email', title: 'Email', sortable: true, render: ({ user }) => user.email },
+              { accessor: 'event', title: 'Sự kiện', sortable: true, render: ({ event }) => event.title },
+              { accessor: 'ticket_type', title: 'Loại vé', sortable: true, render: ({ ticket }) => ticket.ticket_type },
+              { accessor: 'quantity', title: 'Số lượng', sortable: true },
+              { accessor: 'total_amount', title: 'Tổng tiền', sortable: true, render: ({ total_amount }) => formatCurrency(total_amount) },
+              { accessor: 'status', title: 'Trạng thái', sortable: true, render: ({ status }) => (
+                <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(status)}`}>{getStatusText(status)}</span>
+              ) },
+              { accessor: 'created_at', title: 'Ngày đặt', sortable: true, render: ({ event }) => <div>{formatDate(event.start_date)}</div> },
+            ]}
+            totalRecords={initialRecords.length}
+            recordsPerPage={pageSize}
+            page={page}
+            onPageChange={setPage}
+            recordsPerPageOptions={PAGE_SIZES}
+            onRecordsPerPageChange={setPageSize}
+            sortStatus={sortStatus}
+            onSortStatusChange={setSortStatus}
+            minHeight={200}
+            paginationText={({ from, to, totalRecords }) => `Hiển thị ${from} đến ${to} trên tổng ${totalRecords} đơn hàng`}
+          />
         </div>
       </div>
 

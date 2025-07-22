@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export interface LoginResponse {
   access_token: string;
@@ -73,8 +73,11 @@ export const apiCall = async (
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  // Đảm bảo endpoint luôn bắt đầu bằng /api/
-  let url = endpoint.startsWith('/api/') ? `${API_BASE_URL}${endpoint}` : `${API_BASE_URL}/api${endpoint}`;
+  // Luôn đảm bảo endpoint gọi về backend Laravel
+  let cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  let url = cleanEndpoint.startsWith('/api/')
+    ? `${API_BASE_URL}${cleanEndpoint}`
+    : `${API_BASE_URL}/api${cleanEndpoint}`;
 
   const config: RequestInit = {
     ...options,
@@ -108,7 +111,7 @@ export const apiCall = async (
 // Login function
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
   
-  const response = await fetch(`${API_BASE_URL}/login`, {
+  const response = await fetch(`${API_BASE_URL}/api/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

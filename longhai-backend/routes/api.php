@@ -17,6 +17,8 @@ use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\API\ReportController;
 use App\Http\Controllers\API\NewsController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\API\ContactController;
+use Illuminate\Support\Facades\Validator;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,6 +30,9 @@ use App\Http\Controllers\ChatController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+Route::post('/contacts', [ContactController::class, 'store']);
+Route::put('/contacts/{id}', [\App\Http\Controllers\API\ContactController::class, 'update']);
+
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -37,9 +42,20 @@ Route::get('/events', [EventController::class, 'index']);
 Route::get('/news/featured', [NewsController::class, 'featured']);
 Route::get('/banners', [BannerController::class, 'index']);
 Route::get('/news', [NewsController::class, 'index']);
+Route::get('/news/slug/{slug}', [NewsController::class, 'showBySlug']);
+
+// Public
+Route::get('/categories', [\App\Http\Controllers\API\CategoryController::class, 'index']);
+Route::post('/categories', [\App\Http\Controllers\API\CategoryController::class, 'store']);
+Route::get('/categories/{id}', [\App\Http\Controllers\API\CategoryController::class, 'show']);
+Route::put('/categories/{id}', [\App\Http\Controllers\API\CategoryController::class, 'update']);
+Route::delete('/categories/{id}', [\App\Http\Controllers\API\CategoryController::class, 'destroy']);
+
 
 // Protected routes (bảo vệ tất cả các API còn lại)
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/news/categories', [NewsController::class, 'categories']);
+
     // Event routes
     Route::get('/events/{id}', [EventController::class, 'show']);
 
@@ -47,8 +63,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/banners/all', [BannerController::class, 'all']);
 
     // News routes
-    Route::get('/news/categories', [NewsController::class, 'categories']);
-    Route::get('/news/slug/{slug}', [NewsController::class, 'showBySlug']);
 
     // Seating routes
     Route::get('/seats/{eventId}', [SeatingController::class, 'getSeats']);
@@ -227,4 +241,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/tickets', [ReportController::class, 'getTicketReport']);
         Route::get('/export', [ReportController::class, 'exportReport']);
     });
+
+    // Contact management (CMS)
+    Route::get('/contacts', [ContactController::class, 'index']);
+    Route::get('/contacts/{id}', [ContactController::class, 'show']);
+    Route::delete('/contacts/{id}', [ContactController::class, 'destroy']);
+
+    // Note API
+    Route::get('/notes', [\App\Http\Controllers\API\NoteController::class, 'index']);
+    Route::post('/notes', [\App\Http\Controllers\API\NoteController::class, 'store']);
+    Route::get('/notes/{id}', [\App\Http\Controllers\API\NoteController::class, 'show']);
+    Route::put('/notes/{id}', [\App\Http\Controllers\API\NoteController::class, 'update']);
+    Route::delete('/notes/{id}', [\App\Http\Controllers\API\NoteController::class, 'destroy']);
+    Route::post('/notes/{id}/toggle-fav', [\App\Http\Controllers\API\NoteController::class, 'toggleFav']);
 }); 
