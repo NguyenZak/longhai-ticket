@@ -14,4 +14,27 @@ const nextConfig = {
     },
 };
 
-module.exports = nextConfig;
+module.exports = {
+  ...nextConfig,
+  webpack(config) {
+    config.module.rules.push({
+      test: /\.svg$/,
+      issuer: { and: [/[jt]sx?$/] },
+      use: [
+        {
+          loader: '@svgr/webpack',
+          options: {
+            icon: true,
+            svgo: true,
+            svgoConfig: {
+              plugins: [
+                { name: 'removeViewBox', active: false },
+              ],
+            },
+          },
+        },
+      ],
+    });
+    return config;
+  },
+};

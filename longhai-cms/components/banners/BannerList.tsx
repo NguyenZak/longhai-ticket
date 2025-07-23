@@ -89,12 +89,15 @@ export default function BannerList() {
   return (
     <div className="space-y-6">
       {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Danh sách Banner</h2>
         <button
           onClick={() => setShowForm(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
           Thêm Banner Mới
         </button>
+      </div>
     
 
       {/* Error Message */}

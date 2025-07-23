@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="svg935" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" version="1.1" viewBox="0 0 24 24">
+  <!-- Generator: Adobe Illustrator 29.6.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 9)  -->
+  <sodipodi:namedview id="namedview937" bordercolor="#666666" borderopacity="1" gridtolerance="10" guidetolerance="10" inkscape:current-layer="svg935" inkscape:cx="17.08435" inkscape:cy="8.9404306" inkscape:pagecheckerboard="0" inkscape:pageopacity="0" inkscape:pageshadow="2" inkscape:window-height="1360" inkscape:window-maximized="0" inkscape:window-width="2558" inkscape:window-x="0" inkscape:window-y="2214" inkscape:zoom="30.759145" objecttolerance="10" pagecolor="#ffffff" showgrid="false"/>
+  <path id="path933" d="M19,5h3v2h-3v3h-2v-3h-3v-2h3v-3h2v3Z" sodipodi:nodetypes="ccccccccccccc"/>
+  <g>
+    <path d="M22,12c0,1.65-1.35,3-3,3s-3-1.35-3-3c0-.12.01-.23.03-.34h5.94c.02.11.03.22.03.34Z"/>
+    <circle cx="5" cy="12" r="3"/>
+    <circle cx="12" cy="12" r="3"/>
+  </g>
+</svg>

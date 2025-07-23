@@ -1,0 +1,1283 @@
+import React, { useRef, useState, useEffect } from 'react';
+import { useSvgPanZoom } from './useSvgPanZoom';
+
+interface EditorText {
+  id: string;
+  x: number;
+  y: number;
+  content: string;
+  fontSize?: number;
+  color?: string;
+  rotation?: number;
+  shapeId?: string;
+}
+
+interface Seat {
+  id: string;
+  col: number;
+  row: number;
+  label: string;
+}
+
+interface SeatMapEditorProps {
+  canvasWidth?: number;
+  canvasHeight?: number;
+  rows?: number[];
+  zoneX?: number;
+  padding?: number;
+  seats?: Seat[];
+  onSeatClick?: (seat: Seat) => void;
+  selected?: Seat | null;
+  activeTool?: string;
+  onAddSeats?: (seats: Seat[]) => void;
+  texts?: EditorText[];
+  onAddText?: (x: number, y: number) => void;
+  editingText?: string | null;
+  onTextClick?: (id: string) => void;
+  onTextEdit?: (id: string) => void;
+  onTextChange?: (id: string, content: string) => void;
+  onTextMoveStart?: (id: string, x: number, y: number, mouseX: number, mouseY: number) => void;
+  onTextMove?: (mouseX: number, mouseY: number) => void;
+  onTextMoveEnd?: () => void;
+  onTextAttrChange?: (id: string, attr: Partial<{ content: string; color: string; rotation: number; fontSize: number }>) => void;
+  shapes?: Array<
+    | { id: string; type: 'rectangle'; x: number; y: number; w: number; h: number; color: string; rotation?: number; fillColor?: string; borderColor?: string; borderWidth?: number }
+    | { id: string; type: 'circle'; cx: number; cy: number; r: number; color: string; rotation?: number; fillColor?: string; borderColor?: string; borderWidth?: number }
+    | { id: string; type: 'oval'; cx: number; cy: number; rx: number; ry: number; color: string; rotation?: number; fillColor?: string; borderColor?: string; borderWidth?: number }
+    | { id: string; type: 'polygon'; points: { x: number; y: number }[]; color: string; rotation?: number; fillColor?: string; borderColor?: string; borderWidth?: number }
+  >;
+  onAddShape?: (shape: any) => void;
+  onUpdateShape?: (id: string, partial: any) => void;
+  selectedShapeId?: string | null;
+  setSelectedShapeId?: (id: string | null) => void;
+  selectedTextId?: string | null;
+  setSelectedTextId?: (id: string | null) => void;
+  zoom?: number;
+  onCenterPan?: (fn: () => void) => void; // Parent provides a setter for center pan
+}
+
+const GRID_SPACING = 25;
+
+export default function SeatMapEditor({
+  canvasWidth,
+  canvasHeight,
+  rows = [],
+  zoneX = 0,
+  padding = 0,
+  seats = [],
+  onSeatClick,
+  selected,
+  activeTool,
+  onAddSeats,
+  texts = [],
+  onAddText,
+  selectedTextId,
+  editingText,
+  onTextClick,
+  onTextEdit,
+  onTextChange,
+  onTextMoveStart,
+  onTextMove,
+  onTextMoveEnd,
+  onTextAttrChange,
+  shapes = [],
+  onAddShape,
+  onUpdateShape,
+  selectedShapeId,
+  setSelectedShapeId,
+  setSelectedTextId,
+  zoom = 1,
+  onCenterPan,
+}: SeatMapEditorProps) {
+  const gridWidth = typeof canvasWidth === 'number' ? canvasWidth : 800;
+  const gridHeight = typeof canvasHeight === 'number' ? canvasHeight : 800;
+  const svgWidth = gridWidth + 2 * padding;
+  const svgHeight = gridHeight + 2 * padding;
+
+  // Store initialViewBox for reset
+  const initialViewBox = { x: 0, y: 0, w: gridWidth, h: gridHeight };
+  const { viewBox, setViewBox, onMouseDown: panDown, onMouseMove: panMove, onMouseUp: panUp, onWheelNative } = useSvgPanZoom(initialViewBox);
+
+  // Expose center pan to parent
+  useEffect(() => {
+    if (!onCenterPan) return;
+    onCenterPan(() => setViewBox(initialViewBox));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setViewBox, gridWidth, gridHeight]);
+  // Replace scale calculation for SVG transform
+  const scale = (1000 / viewBox.w) * zoom;
+  const translate = {
+    x: padding - viewBox.x * scale,
+    y: padding - viewBox.y * scale,
+  };
+
+  // State cho vẽ row multi-step
+  const [rowDrawing, setRowDrawing] = useState(false);
+  const [drawingStart, setDrawingStart] = useState<{ x: number; y: number } | null>(null);
+  const [drawingCurrent, setDrawingCurrent] = useState<{ x: number; y: number } | null>(null);
+
+  // State cho vẽ rectangle
+  const [rectDrawing, setRectDrawing] = useState(false);
+  const [rectStart, setRectStart] = useState<{ x: number; y: number } | null>(null);
+  const [rectCurrent, setRectCurrent] = useState<{ x: number; y: number } | null>(null);
+
+  // State cho vẽ circle
+  const [circleDrawing, setCircleDrawing] = useState(false);
+  const [circleStart, setCircleStart] = useState<{ x: number; y: number } | null>(null);
+  const [circleCurrent, setCircleCurrent] = useState<{ x: number; y: number } | null>(null);
+
+  // State cho vẽ oval
+  const [ovalDrawing, setOvalDrawing] = useState(false);
+  const [ovalStart, setOvalStart] = useState<{ x: number; y: number } | null>(null);
+  const [ovalCurrent, setOvalCurrent] = useState<{ x: number; y: number } | null>(null);
+
+  // State cho vẽ polygon
+  const [polyDrawing, setPolyDrawing] = useState(false);
+  const [polyPoints, setPolyPoints] = useState<{ x: number; y: number }[]>([]);
+
+  function handleSvgMouseDown(e: React.MouseEvent<SVGSVGElement, MouseEvent>) {
+    if (e.target === e.currentTarget) {
+      if (typeof setSelectedShapeId === 'function') setSelectedShapeId(null);
+      if (typeof setSelectedTextId === 'function') setSelectedTextId(null);
+      return;
+    }
+    if (activeTool === 'row') {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      if (!rowDrawing) {
+        setDrawingStart({ x: snapX, y: snapY });
+        setDrawingCurrent(null);
+        setRowDrawing(true);
+      } else {
+        // Click lần hai: sinh row
+        if (drawingStart) {
+          const dx = snapX - drawingStart.x;
+          const dy = snapY - drawingStart.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx);
+          const count = Math.max(2, Math.round(len / GRID_SPACING));
+          const seats: Seat[] = [];
+          for (let i = 0; i < count; ++i) {
+            const x = drawingStart.x + i * GRID_SPACING * Math.cos(angle);
+            const y = drawingStart.y + i * GRID_SPACING * Math.sin(angle);
+            const snapX2 = Math.round(x / GRID_SPACING) * GRID_SPACING;
+            const snapY2 = Math.round(y / GRID_SPACING) * GRID_SPACING;
+            const row = Math.round(snapY2 / GRID_SPACING);
+            const col = Math.round(snapX2 / GRID_SPACING);
+            const label = String.fromCharCode(65 + row) + (col + 1);
+            seats.push({
+              id: `row-${Date.now()}-${i}`,
+              col,
+              row,
+              label,
+            });
+          }
+          if (onAddSeats) onAddSeats(seats);
+        }
+        setRowDrawing(false);
+        setDrawingStart(null);
+        setDrawingCurrent(null);
+      }
+      return;
+    }
+    if (activeTool === 'rows') {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      setRowsStart({ x: snapX, y: snapY });
+      setRowsCurrent({ x: snapX, y: snapY });
+      setRowsDrawing(true);
+      return;
+    }
+    if (activeTool === 'seat') {
+      const pt = getSvgPoint(e);
+      // Snap vào grid
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      // Sinh label/id tự động (A1, B1, ...)
+      const row = Math.round(snapY / GRID_SPACING);
+      const col = Math.round(snapX / GRID_SPACING);
+      const label = String.fromCharCode(65 + row) + (col + 1);
+      const seat = {
+        id: `seat-${Date.now()}`,
+        col,
+        row,
+        label,
+      };
+      if (onAddSeats) onAddSeats([seat]);
+      return;
+    }
+    if (activeTool === 'text') {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      if (onAddText) onAddText(snapX, snapY);
+      return;
+    }
+    if (activeTool === 'rectangle') {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      setRectStart({ x: snapX, y: snapY });
+      setRectCurrent({ x: snapX, y: snapY });
+      setRectDrawing(true);
+      return;
+    }
+    if (activeTool === 'circle') {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      setCircleStart({ x: snapX, y: snapY });
+      setCircleCurrent({ x: snapX, y: snapY });
+      setCircleDrawing(true);
+      return;
+    }
+    if (activeTool === 'oval') {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      setOvalStart({ x: snapX, y: snapY });
+      setOvalCurrent({ x: snapX, y: snapY });
+      setOvalDrawing(true);
+      return;
+    }
+    if (activeTool === 'polygon') {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      if (!polyDrawing) {
+        setPolyDrawing(true);
+        setPolyPoints([{ x: snapX, y: snapY }]);
+      } else {
+        setPolyPoints((prev: { x: number; y: number }[]) => [...prev, { x: snapX, y: snapY }]);
+      }
+      return;
+    }
+    // Chỉ cho phép pan khi giữ Cmd/Ctrl
+    if (e.ctrlKey || e.metaKey) {
+      panDown(e);
+    }
+  }
+  function handleSvgMouseMove(e: React.MouseEvent<SVGSVGElement, MouseEvent>) {
+    if (activeTool === 'row' && rowDrawing && drawingStart) {
+      let pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      let x = snapX, y = snapY;
+      if (!e.shiftKey) {
+        const dx = Math.abs(snapX - drawingStart.x);
+        const dy = Math.abs(snapY - drawingStart.y);
+        if (dx > dy) {
+          y = drawingStart.y; // Hàng ngang
+        } else {
+          x = drawingStart.x; // Cột dọc
+        }
+      }
+      setDrawingCurrent({ x, y });
+      return;
+    }
+    if (activeTool === 'rows' && rowsDrawing && rowsStart) {
+      let pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      setRowsCurrent({ x: snapX, y: snapY });
+      return;
+    }
+    if (activeTool === 'rectangle' && rectDrawing && rectStart) {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      setRectCurrent({ x: snapX, y: snapY });
+      return;
+    }
+    if (activeTool === 'circle' && circleDrawing && circleStart) {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      setCircleCurrent({ x: snapX, y: snapY });
+      return;
+    }
+    if (activeTool === 'oval' && ovalDrawing && ovalStart) {
+      const pt = getSvgPoint(e);
+      const snapX = Math.round(pt.x / GRID_SPACING) * GRID_SPACING;
+      const snapY = Math.round(pt.y / GRID_SPACING) * GRID_SPACING;
+      setOvalCurrent({ x: snapX, y: snapY });
+      return;
+    }
+    if (activeTool === 'polygon' && polyDrawing && polyPoints.length > 0) {
+      // Preview cạnh cuối cùng theo chuột
+      // Không cần set state, chỉ render preview
+      return;
+    }
+    // Chỉ cho phép pan khi giữ Cmd/Ctrl
+    if (e.ctrlKey || e.metaKey) {
+      panMove(e);
+    }
+  }
+  function handleSvgMouseUp(e: React.MouseEvent<SVGSVGElement, MouseEvent>) {
+    if (activeTool === 'row' && rowDrawing && drawingStart && drawingCurrent) {
+      // Snap về grid spacing
+      const dx = drawingCurrent.x - drawingStart.x;
+      const dy = drawingCurrent.y - drawingStart.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+      const count = Math.max(2, Math.round(len / GRID_SPACING));
+      const seats: Seat[] = [];
+      for (let i = 0; i < count; ++i) {
+        const x = drawingStart.x + i * GRID_SPACING * Math.cos(angle);
+        const y = drawingStart.y + i * GRID_SPACING * Math.sin(angle);
+        const snapX = Math.round(x / GRID_SPACING) * GRID_SPACING;
+        const snapY = Math.round(y / GRID_SPACING) * GRID_SPACING;
+        const row = Math.round(snapY / GRID_SPACING);
+        const col = Math.round(snapX / GRID_SPACING);
+        const label = String.fromCharCode(65 + row) + (col + 1);
+        seats.push({
+          id: `row-${Date.now()}-${i}`,
+          col,
+          row,
+          label,
+        });
+      }
+      if (onAddSeats) onAddSeats(seats);
+      setRowDrawing(false);
+      setDrawingStart(null);
+      setDrawingCurrent(null);
+      return;
+    } else if (activeTool === 'rows' && rowsDrawing && rowsStart && rowsCurrent) {
+      // Tính block
+      const x0 = Math.min(rowsStart.x, rowsCurrent.x);
+      const y0 = Math.min(rowsStart.y, rowsCurrent.y);
+      const x1 = Math.max(rowsStart.x, rowsCurrent.x);
+      const y1 = Math.max(rowsStart.y, rowsCurrent.y);
+      const cols = Math.round((x1 - x0) / GRID_SPACING) + 1;
+      const rowsCount = Math.round((y1 - y0) / GRID_SPACING) + 1;
+      const seats: Seat[] = [];
+      for (let r = 0; r < rowsCount; ++r) {
+        for (let c = 0; c < cols; ++c) {
+          const row = Math.round((y0 + r * GRID_SPACING) / GRID_SPACING);
+          const col = Math.round((x0 + c * GRID_SPACING) / GRID_SPACING);
+          const label = String.fromCharCode(65 + row) + (col + 1);
+          seats.push({
+            id: `rows-${Date.now()}-${r}-${c}`,
+            col,
+            row,
+            label,
+          });
+        }
+      }
+      if (onAddSeats) onAddSeats(seats);
+      setRowsDrawing(false);
+      setRowsStart(null);
+      setRowsCurrent(null);
+    } else if (activeTool === 'rectangle' && rectDrawing && rectStart && rectCurrent) {
+      const x = Math.min(rectStart.x, rectCurrent.x);
+      const y = Math.min(rectStart.y, rectCurrent.y);
+      const w = Math.abs(rectCurrent.x - rectStart.x);
+      const h = Math.abs(rectCurrent.y - rectStart.y);
+      if (w > 0 && h > 0 && onAddShape) {
+        onAddShape({ id: `rect-${Date.now()}`, type: 'rectangle', x, y, w, h, color: '#1976d2' });
+      }
+      setRectDrawing(false);
+      setRectStart(null);
+      setRectCurrent(null);
+    } else if (activeTool === 'circle' && circleDrawing && circleStart && circleCurrent) {
+      const dx = circleCurrent.x - circleStart.x;
+      const dy = circleCurrent.y - circleStart.y;
+      const r = Math.round(Math.sqrt(dx * dx + dy * dy));
+      if (r > 0 && onAddShape) {
+        onAddShape({ id: `circle-${Date.now()}`, type: 'circle', cx: circleStart.x, cy: circleStart.y, r, color: '#43a047' });
+      }
+      setCircleDrawing(false);
+      setCircleStart(null);
+      setCircleCurrent(null);
+    } else if (activeTool === 'oval' && ovalDrawing && ovalStart && ovalCurrent) {
+      const cx = (ovalStart.x + ovalCurrent.x) / 2;
+      const cy = (ovalStart.y + ovalCurrent.y) / 2;
+      const rx = Math.abs(ovalCurrent.x - ovalStart.x) / 2;
+      const ry = Math.abs(ovalCurrent.y - ovalStart.y) / 2;
+      if (rx > 0 && ry > 0 && onAddShape) {
+        onAddShape({ id: `oval-${Date.now()}`, type: 'oval', cx, cy, rx, ry, color: '#fbc02d' });
+      }
+      setOvalDrawing(false);
+      setOvalStart(null);
+      setOvalCurrent(null);
+    } else if (activeTool === 'polygon' && polyDrawing && polyPoints.length >= 3) {
+      // REMOVE this block: do not auto-complete polygon on mouse up
+      // Only finish polygon on double click or Enter/Escape
+      // (No code here)
+    } else {
+      // Chỉ cho phép pan khi giữ Cmd/Ctrl
+      if (e.ctrlKey || e.metaKey) {
+        panUp();
+      }
+    }
+  }
+  function handleSvgDoubleClick(e: React.MouseEvent<SVGSVGElement, MouseEvent>) {
+    if (activeTool === 'polygon' && polyDrawing && polyPoints.length >= 3) {
+      if (onAddShape) {
+        onAddShape({ id: `poly-${Date.now()}`, type: 'polygon', points: polyPoints, color: '#d32f2f' });
+      }
+      setPolyDrawing(false);
+      setPolyPoints([]);
+      return;
+    }
+    // Chỉ cho phép pan khi giữ Cmd/Ctrl
+    if (e.ctrlKey || e.metaKey) {
+      panUp();
+    }
+  }
+  function handleSvgKeyDown(e: React.KeyboardEvent<SVGSVGElement>) {
+    // Polygon finish
+    if (activeTool === 'polygon' && polyDrawing && polyPoints.length >= 3 && (e.key === 'Enter' || e.key === 'Escape')) {
+      if (onAddShape) {
+        onAddShape({ id: `poly-${Date.now()}`, type: 'polygon', points: polyPoints, color: '#d32f2f' });
+      }
+      setPolyDrawing(false);
+      setPolyPoints([]);
+      return;
+    }
+    // Clipboard shortcuts
+    const isMac = navigator.platform.toLowerCase().includes('mac');
+    const ctrl = isMac ? e.metaKey : e.ctrlKey;
+    // Cut
+    if (ctrl && e.key.toLowerCase() === 'x') {
+      if (selectedShapeId) {
+        const shape = shapes.find(s => s.id === selectedShapeId);
+        if (shape) {
+          setClipboard({ type: 'shape', data: JSON.parse(JSON.stringify(shape)) });
+          if (onUpdateShape) onUpdateShape(selectedShapeId, { _delete: true });
+          if (setSelectedShapeId) setSelectedShapeId(null);
+        }
+      } else if (selectedTextId) {
+        const text = texts.find(t => t.id === selectedTextId);
+        if (text) {
+          setClipboard({ type: 'text', data: JSON.parse(JSON.stringify(text)) });
+          if (onTextEdit) onTextEdit('');
+          if (onTextChange) onTextChange(text.id, ''); // Mark as deleted
+          if (setSelectedTextId) setSelectedTextId(null);
+        }
+      }
+      e.preventDefault();
+      return;
+    }
+    // Copy
+    if (ctrl && e.key.toLowerCase() === 'c') {
+      if (selectedShapeId) {
+        const shape = shapes.find(s => s.id === selectedShapeId);
+        if (shape) setClipboard({ type: 'shape', data: JSON.parse(JSON.stringify(shape)) });
+      } else if (selectedTextId) {
+        const text = texts.find(t => t.id === selectedTextId);
+        if (text) setClipboard({ type: 'text', data: JSON.parse(JSON.stringify(text)) });
+      }
+      e.preventDefault();
+      return;
+    }
+    // Paste
+    if (ctrl && e.key.toLowerCase() === 'v') {
+      if (clipboard) {
+        if (clipboard.type === 'shape' && onAddShape && setSelectedShapeId) {
+          const shape = { ...clipboard.data, id: `${clipboard.data.type}-${Date.now()}`, x: (clipboard.data.x ?? clipboard.data.cx ?? 0) + 20, y: (clipboard.data.y ?? clipboard.data.cy ?? 0) + 20 };
+          if (shape.type === 'rectangle') shape.x += 20, shape.y += 20;
+          if (shape.type === 'circle' || shape.type === 'oval') shape.cx += 20, shape.cy += 20;
+          if (shape.type === 'polygon') shape.points = shape.points.map((pt: any) => ({ x: pt.x + 20, y: pt.y + 20 }));
+          onAddShape(shape);
+          setSelectedShapeId(shape.id);
+        } else if (clipboard.type === 'text' && onAddText && setSelectedTextId) {
+          const text = { ...clipboard.data, id: `text-${Date.now()}`, x: clipboard.data.x + 20, y: clipboard.data.y + 20 };
+          if (onAddText) onAddText(text.x, text.y);
+          setSelectedTextId(text.id);
+        }
+      }
+      e.preventDefault();
+      return;
+    }
+    // Delete
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (selectedShapeId && onUpdateShape) {
+        onUpdateShape(selectedShapeId, { _delete: true });
+        if (setSelectedShapeId) setSelectedShapeId(null);
+      } else if (selectedTextId && onTextEdit && onTextChange) {
+        onTextEdit('');
+        onTextChange(selectedTextId, ''); // Mark as deleted
+        if (setSelectedTextId) setSelectedTextId(null);
+      }
+      e.preventDefault();
+      return;
+    }
+    // Chỉ cho phép pan khi giữ Cmd/Ctrl
+    if (e.ctrlKey || e.metaKey) {
+      panUp();
+    }
+  }
+
+  // Lấy toạ độ SVG từ event
+  function getSvgPoint(e: React.MouseEvent<SVGSVGElement, MouseEvent>) {
+    // Tính trực tiếp từ offsetX/offsetY, scale, translate (không cần createSVGPoint)
+    const x = (e.nativeEvent.offsetX - translate.x) / scale;
+    const y = (e.nativeEvent.offsetY - translate.y) / scale;
+    return { x, y };
+  }
+
+  // Preview row khi vẽ
+  let rowPreviewSeats: { x: number; y: number }[] = [];
+  if (rowDrawing && drawingStart && drawingCurrent) {
+    const dx = drawingCurrent.x - drawingStart.x;
+    const dy = drawingCurrent.y - drawingStart.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    const count = Math.max(2, Math.round(len / GRID_SPACING));
+    for (let i = 0; i < count; ++i) {
+      const x = drawingStart.x + i * GRID_SPACING * Math.cos(angle);
+      const y = drawingStart.y + i * GRID_SPACING * Math.sin(angle);
+      rowPreviewSeats.push({ x, y });
+    }
+  }
+
+  // State cho vẽ block rows
+  const [rowsDrawing, setRowsDrawing] = useState(false);
+  const [rowsStart, setRowsStart] = useState<{ x: number; y: number } | null>(null);
+  const [rowsCurrent, setRowsCurrent] = useState<{ x: number; y: number } | null>(null);
+
+  // Preview block rows
+  let rowsPreviewSeats: { x: number; y: number }[] = [];
+  let rowsPreviewCols = 0, rowsPreviewRows = 0;
+  if (activeTool === 'rows' && rowsDrawing && rowsStart && rowsCurrent) {
+    const x0 = Math.min(rowsStart.x, rowsCurrent.x);
+    const y0 = Math.min(rowsStart.y, rowsCurrent.y);
+    const x1 = Math.max(rowsStart.x, rowsCurrent.x);
+    const y1 = Math.max(rowsStart.y, rowsCurrent.y);
+    rowsPreviewCols = Math.round((x1 - x0) / GRID_SPACING) + 1;
+    rowsPreviewRows = Math.round((y1 - y0) / GRID_SPACING) + 1;
+    for (let r = 0; r < rowsPreviewRows; ++r) {
+      for (let c = 0; c < rowsPreviewCols; ++c) {
+        rowsPreviewSeats.push({
+          x: x0 + c * GRID_SPACING,
+          y: y0 + r * GRID_SPACING,
+        });
+      }
+    }
+  }
+
+  // Preview rectangle khi vẽ
+  let rectPreviewSeats: { x: number; y: number }[] = [];
+  if (rectDrawing && rectStart && rectCurrent) {
+    const x = Math.min(rectStart.x, rectCurrent.x);
+    const y = Math.min(rectStart.y, rectCurrent.y);
+    const w = Math.abs(rectCurrent.x - rectStart.x);
+    const h = Math.abs(rectCurrent.y - rectStart.y);
+    for (let i = 0; i < 4; ++i) {
+      const angle = (i * Math.PI) / 2;
+      const px = x + w / 2 + w * Math.cos(angle) / 2;
+      const py = y + h / 2 + h * Math.sin(angle) / 2;
+      rectPreviewSeats.push({ x: px, y: py });
+    }
+  }
+
+  // Preview circle khi vẽ
+  let circlePreviewSeats: { x: number; y: number }[] = [];
+  if (circleDrawing && circleStart && circleCurrent) {
+    const dx = circleCurrent.x - circleStart.x;
+    const dy = circleCurrent.y - circleStart.y;
+    const r = Math.round(Math.sqrt(dx * dx + dy * dy));
+    for (let i = 0; i < 360; ++i) { // Vẽ đường tròn đầy đủ
+      const angle = (i * Math.PI) / 180;
+      const px = circleStart.x + r * Math.cos(angle);
+      const py = circleStart.y + r * Math.sin(angle);
+      circlePreviewSeats.push({ x: px, y: py });
+    }
+  }
+
+  // Preview oval khi vẽ
+  let ovalPreviewSeats: { x: number; y: number }[] = [];
+  if (ovalDrawing && ovalStart && ovalCurrent) {
+    const cx = (ovalStart.x + ovalCurrent.x) / 2;
+    const cy = (ovalStart.y + ovalCurrent.y) / 2;
+    const rx = Math.abs(ovalCurrent.x - ovalStart.x) / 2;
+    const ry = Math.abs(ovalCurrent.y - ovalStart.y) / 2;
+    for (let i = 0; i < 360; ++i) { // Vẽ đường ellipse đầy đủ
+      const angle = (i * Math.PI) / 180;
+      const px = cx + rx * Math.cos(angle);
+      const py = cy + ry * Math.sin(angle);
+      ovalPreviewSeats.push({ x: px, y: py });
+    }
+  }
+
+  // Preview polygon khi vẽ
+  let polyPreviewSeats: { x: number; y: number }[] = [];
+  if (polyDrawing && polyPoints.length > 0) {
+    polyPreviewSeats = polyPoints;
+  }
+
+  // Demo: group seats by row
+  const seatsByRow: Record<number, Seat[]> = {};
+  seats.forEach(seat => {
+    if (!seatsByRow[seat.row]) seatsByRow[seat.row] = [];
+    seatsByRow[seat.row].push(seat);
+  });
+
+  // State cho resize text
+  const [resizingTextId, setResizingTextId] = useState<string | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ mouseX: number; mouseY: number; fontSize: number } | null>(null);
+
+  // State chọn, drag, resize shape
+  const [draggingShapeId, setDraggingShapeId] = useState<string | null>(null);
+  const [dragOffsetShape, setDragOffsetShape] = useState<{ x: number; y: number } | null>(null);
+  const [resizingShapeId, setResizingShapeId] = useState<string | null>(null);
+  const [resizeShapeStart, setResizeShapeStart] = useState<{ mouseX: number; mouseY: number; w: number; h: number; r?: number; rx?: number; ry?: number } | null>(null);
+
+  // Clipboard state
+  const [clipboard, setClipboard] = useState<{ type: 'shape' | 'text'; data: any } | null>(null);
+
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        onWheelNative(e);
+      }
+    };
+    svg.addEventListener('wheel', handleWheel, { passive: false });
+    return () => svg.removeEventListener('wheel', handleWheel);
+  }, [onWheelNative]);
+
+  // Drag text
+  useEffect(() => {
+    if (!onTextMove || !onTextMoveEnd) return;
+    function handleMouseMove(e: MouseEvent) {
+      onTextMove(e.offsetX, e.offsetY);
+    }
+    function handleMouseUp() {
+      onTextMoveEnd();
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    }
+    if (svgRef.current) {
+      svgRef.current.addEventListener('mousemove', handleMouseMove);
+      svgRef.current.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      if (svgRef.current) {
+        svgRef.current.removeEventListener('mousemove', handleMouseMove);
+        svgRef.current.removeEventListener('mouseup', handleMouseUp);
+      }
+    };
+  }, [onTextMove, onTextMoveEnd]);
+
+  // Drag shape
+  function handleShapeDragStart(id: string, shape: any, mouseX: number, mouseY: number) {
+    setDraggingShapeId(id);
+    if (shape.type === 'rectangle') setDragOffsetShape({ x: shape.x - mouseX, y: shape.y - mouseY });
+    if (shape.type === 'circle') setDragOffsetShape({ x: shape.cx - mouseX, y: shape.cy - mouseY });
+    if (shape.type === 'oval') setDragOffsetShape({ x: shape.cx - mouseX, y: shape.cy - mouseY });
+    if (shape.type === 'polygon') setDragOffsetShape({
+      points: shape.points.map(pt => ({ x: pt.x - mouseX, y: pt.y - mouseY })),
+      offset: { x: mouseX, y: mouseY }
+    });
+  }
+  useEffect(() => {
+    if (!draggingShapeId || !dragOffsetShape) return;
+    function onMove(e: MouseEvent) {
+      if (!onUpdateShape) return;
+      const mouseX = e.offsetX;
+      const mouseY = e.offsetY;
+      const shape = shapes.find(s => s.id === draggingShapeId);
+      if (!shape) return;
+      if (onUpdateShape && shape.type === 'rectangle') {
+        onUpdateShape(draggingShapeId as string, { x: Math.round(mouseX + dragOffsetShape.x), y: Math.round(mouseY + dragOffsetShape.y) });
+      } else if (onUpdateShape && (shape.type === 'circle' || shape.type === 'oval')) {
+        onUpdateShape(draggingShapeId as string, { cx: Math.round(mouseX + dragOffsetShape.x), cy: Math.round(mouseY + dragOffsetShape.y) });
+      } else if (onUpdateShape && shape.type === 'polygon') {
+        if ('offset' in dragOffsetShape) {
+          const dx = mouseX - dragOffsetShape.offset.x;
+          const dy = mouseY - dragOffsetShape.offset.y;
+          onUpdateShape(draggingShapeId as string, {
+            points: shape.points.map((pt: { x: number; y: number }, i: number) => ({ x: pt.x + dx, y: pt.y + dy }))
+          });
+        }
+      }
+    }
+    function onUp() {
+      setDraggingShapeId(null);
+      setDragOffsetShape(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [draggingShapeId, dragOffsetShape, onUpdateShape, shapes]);
+
+  // Resize shape (rectangle only)
+  function handleShapeResizeStart(id: string, shape: any, mouseX: number, mouseY: number) {
+    setResizingShapeId(id);
+    let bbox = { x: 0, y: 0, w: 0, h: 0, cx: 0, cy: 0 };
+    if (shape.type === 'rectangle') bbox = { x: shape.x, y: shape.y, w: shape.w, h: shape.h, cx: shape.x + shape.w/2, cy: shape.y + shape.h/2 };
+    if (shape.type === 'circle') bbox = { x: shape.cx - shape.r, y: shape.cy - shape.r, w: shape.r * 2, h: shape.r * 2, cx: shape.cx, cy: shape.cy };
+    if (shape.type === 'oval') bbox = { x: shape.cx - shape.rx, y: shape.cy - shape.ry, w: shape.rx * 2, h: shape.ry * 2, cx: shape.cx, cy: shape.cy };
+    if (shape.type === 'polygon' && shape.points.length > 0) {
+      const xs = shape.points.map(p => p.x);
+      const ys = shape.points.map(p => p.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      bbox = { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX)/2, cy: (minY + maxY)/2 };
+    }
+    setResizeShapeStart({ mouseX, mouseY, ...bbox, shapeType: shape.type, origShape: shape });
+  }
+  useEffect(() => {
+    if (!resizingShapeId || !resizeShapeStart) return;
+    function onMove(e: MouseEvent) {
+      if (!onUpdateShape) return;
+      const dx = e.clientX - resizeShapeStart.mouseX;
+      const dy = e.clientY - resizeShapeStart.mouseY;
+      const { shapeType, origShape, w, h, cx, cy } = resizeShapeStart as any;
+      if (shapeType === 'rectangle') {
+        onUpdateShape(resizingShapeId, { w: Math.max(10, w + dx), h: Math.max(10, h + dy) });
+      } else if (shapeType === 'circle') {
+        // Scale r based on max(dx, dy) from center
+        const newR = Math.max(10, Math.max(Math.abs(w/2 + dx), Math.abs(h/2 + dy)));
+        onUpdateShape(resizingShapeId, { r: newR });
+      } else if (shapeType === 'oval') {
+        // Scale rx/ry based on dx, dy
+        const newRx = Math.max(10, w/2 + dx);
+        const newRy = Math.max(10, h/2 + dy);
+        onUpdateShape(resizingShapeId, { rx: newRx, ry: newRy });
+      } else if (shapeType === 'polygon') {
+        // Scale all points from center
+        const scaleX = (w + dx) / w;
+        const scaleY = (h + dy) / h;
+        onUpdateShape(resizingShapeId, {
+          points: origShape.points.map((pt: { x: number; y: number }) => ({
+            x: cx + (pt.x - cx) * scaleX,
+            y: cy + (pt.y - cy) * scaleY
+          }))
+        });
+      }
+    }
+    function onUp() {
+      setResizingShapeId(null);
+      setResizeShapeStart(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [resizingShapeId, resizeShapeStart, onUpdateShape]);
+
+  // Resize handle mouse events
+  function handleResizeStart(id: string, mouseX: number, mouseY: number, fontSize: number) {
+    setResizingTextId(id);
+    setResizeStart({ mouseX, mouseY, fontSize });
+  }
+  useEffect(() => {
+    if (!resizingTextId || !resizeStart) return;
+    function onMove(e: MouseEvent) {
+      const dx = e.clientX - resizeStart.mouseX;
+      const dy = e.clientY - resizeStart.mouseY;
+      // Tăng fontSize theo khoảng cách kéo chéo, min 8, max 128
+      const delta = Math.max(dx, dy);
+      const newFontSize = Math.max(8, Math.min(128, Math.round(resizeStart.fontSize + delta)));
+      if (onTextAttrChange) onTextAttrChange(resizingTextId, { fontSize: newFontSize });
+    }
+    function onUp() {
+      setResizingTextId(null);
+      setResizeStart(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [resizingTextId, resizeStart, onTextAttrChange]);
+
+  return (
+    <div
+      className="c-plan"
+      style={{ width: '100%', height: '100%', background: '#333' }}
+      onMouseDown={e => {
+        if (e.target === e.currentTarget) {
+          if (typeof setSelectedShapeId === 'function') setSelectedShapeId(null);
+          if (typeof setSelectedTextId === 'function') setSelectedTextId(null);
+        }
+      }}
+    >
+      <svg
+        ref={svgRef}
+        className="c-plan"
+        width={svgWidth}
+        height={svgHeight}
+        preserveAspectRatio="none"
+        style={{ WebkitTapHighlightColor: 'rgba(0, 0, 0, 0)', display: 'block' }}
+        onMouseDown={handleSvgMouseDown}
+        onMouseMove={handleSvgMouseMove}
+        onMouseUp={handleSvgMouseUp}
+        onDoubleClick={handleSvgDoubleClick}
+        tabIndex={0}
+        onKeyDown={handleSvgKeyDown}
+      >
+        <defs>
+          <pattern id="smallGrid" width="10" height="10" patternUnits="userSpaceOnUse">
+            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#ddd" strokeWidth="0.5" />
+          </pattern>
+          <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+            <rect width="100" height="100" fill="url(#smallGrid)" />
+            <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#ccc" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <g
+          transform={`translate(${translate.x},${translate.y}) scale(${scale})`}
+          className="movable zoom-transform"
+        >
+          {/* Nền trắng cho vùng grid */}
+          <rect width={gridWidth} height={gridHeight} fill="#fcfcfc" cursor="default" />
+          {/* Lưới grid */}
+          <rect width={gridWidth} height={gridHeight} fill="url(#grid)" cursor="default" />
+          {/* Dấu cộng tại điểm bắt đầu row */}
+          {activeTool === 'row' && rowDrawing && drawingStart && !drawingCurrent && (
+            <g className="row-start-marker">
+              <circle cx={drawingStart.x} cy={drawingStart.y} r={10} fill="#fff" stroke="#222" strokeWidth={2} />
+              <text x={drawingStart.x} y={drawingStart.y + 3} textAnchor="middle" fontSize={16} fill="#222">+</text>
+            </g>
+          )}
+          {/* Preview row khi vẽ */}
+          {activeTool === 'row' && rowDrawing && drawingStart && drawingCurrent && (
+            <g className="row-preview">
+              <line
+                className="preview"
+                x1={drawingStart.x}
+                y1={drawingStart.y}
+                x2={drawingCurrent.x}
+                y2={drawingCurrent.y}
+                stroke="#aaa"
+                strokeDasharray="4 2"
+              />
+              {/* Số lượng ghế preview */}
+              {rowPreviewSeats.length > 0 && (
+                <text
+                  x={(drawingStart.x + drawingCurrent.x) / 2}
+                  y={Math.min(drawingStart.y, drawingCurrent.y) - 18}
+                  textAnchor="middle"
+                  fontSize={14}
+                  fill="#222"
+                  fontWeight="bold"
+                  style={{ userSelect: 'none' }}
+                >
+                  {rowPreviewSeats.length} ghế
+                </text>
+              )}
+              {rowPreviewSeats.map((pt, i) => (
+                <circle
+                  key={i}
+                  className="seat-preview"
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={10}
+                />
+              ))}
+            </g>
+          )}
+          {/* Preview block rows khi vẽ */}
+          {activeTool === 'rows' && rowsDrawing && rowsStart && rowsCurrent && (
+            <g className="rows-preview">
+              {/* Số cột x số hàng tiếng Việt */}
+              {rowsPreviewCols > 0 && rowsPreviewRows > 0 && (
+                <text
+                  x={(rowsStart.x + rowsCurrent.x) / 2}
+                  y={Math.min(rowsStart.y, rowsCurrent.y) - 18}
+                  textAnchor="middle"
+                  fontSize={14}
+                  fill="#222"
+                  fontWeight="bold"
+                  style={{ userSelect: 'none' }}
+                >
+                  {rowsPreviewCols} cột, {rowsPreviewRows} hàng
+                </text>
+              )}
+              {rowsPreviewSeats.map((pt, i) => (
+                <circle
+                  key={i}
+                  className="seat-preview"
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={10}
+                />
+              ))}
+            </g>
+          )}
+          {/* Preview rectangle khi vẽ */}
+          {activeTool === 'rectangle' && rectDrawing && rectStart && rectCurrent && (
+            <rect
+              x={Math.min(rectStart.x, rectCurrent.x)}
+              y={Math.min(rectStart.y, rectCurrent.y)}
+              width={Math.abs(rectCurrent.x - rectStart.x)}
+              height={Math.abs(rectCurrent.y - rectStart.y)}
+              fill="rgba(25, 118, 210, 0.1)"
+              stroke="#1976d2"
+              strokeDasharray="4 2"
+              strokeWidth={2}
+            />
+          )}
+          {/* Preview circle khi vẽ */}
+          {activeTool === 'circle' && circleDrawing && circleStart && circleCurrent && (
+            <circle
+              cx={circleStart.x}
+              cy={circleStart.y}
+              r={Math.sqrt(Math.pow(circleCurrent.x - circleStart.x, 2) + Math.pow(circleCurrent.y - circleStart.y, 2))}
+              fill="rgba(67, 160, 71, 0.1)"
+              stroke="#43a047"
+              strokeDasharray="4 2"
+              strokeWidth={2}
+            />
+          )}
+          {/* Preview oval khi vẽ */}
+          {activeTool === 'oval' && ovalDrawing && ovalStart && ovalCurrent && (
+            <ellipse
+              cx={(ovalStart.x + ovalCurrent.x) / 2}
+              cy={(ovalStart.y + ovalCurrent.y) / 2}
+              rx={Math.abs(ovalCurrent.x - ovalStart.x) / 2}
+              ry={Math.abs(ovalCurrent.y - ovalStart.y) / 2}
+              fill="rgba(251, 192, 45, 0.1)"
+              stroke="#fbc02d"
+              strokeDasharray="4 2"
+              strokeWidth={2}
+            />
+          )}
+          {/* Preview polygon khi vẽ */}
+          {activeTool === 'polygon' && polyDrawing && polyPoints.length > 0 && (
+            <g>
+              <polyline
+                points={polyPoints.map(pt => `${pt.x},${pt.y}`).join(' ')}
+                fill="rgba(211, 47, 47, 0.1)"
+                stroke="#d32f2f"
+                strokeDasharray="4 2"
+                strokeWidth={2}
+              />
+              {/* Draw points */}
+              {polyPoints.map((pt, i) => (
+                <circle key={i} cx={pt.x} cy={pt.y} r={5} fill="#d32f2f" />
+              ))}
+              {/* Optionally, show a line from last point to mouse (not implemented here) */}
+            </g>
+          )}
+          {/* Render tất cả seat trực tiếp lên grid */}
+          {seats.map(seat => (
+            <g
+              key={seat.id}
+              className={`seat${selected && selected.id === seat.id ? ' selected' : ''}`}
+              transform={`translate(${seat.col * GRID_SPACING}, ${seat.row * GRID_SPACING})`}
+              onClick={e => {
+                e.stopPropagation();
+                onSeatClick && onSeatClick(seat);
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              <circle r={10} cx={0} cy={0} />
+              <text
+                x={0}
+                y={0}
+                textAnchor="middle"
+                alignmentBaseline="central"
+                fontSize={8}
+                fill="#fff"
+              >
+                {seat.label}
+              </text>
+            </g>
+          ))}
+          {/* Render shapes */}
+          {shapes.map(shape => {
+            const isSelected = selectedShapeId === shape.id;
+            // Compute bounding box for all shape types
+            let bbox = { x: 0, y: 0, w: 0, h: 0, cx: 0, cy: 0, rotation: 0 };
+            if (shape.type === 'rectangle') {
+              bbox = { x: shape.x, y: shape.y, w: shape.w, h: shape.h, cx: shape.x + shape.w/2, cy: shape.y + shape.h/2, rotation: shape.rotation || 0 };
+            } else if (shape.type === 'circle') {
+              bbox = { x: shape.cx - shape.r, y: shape.cy - shape.r, w: shape.r * 2, h: shape.r * 2, cx: shape.cx, cy: shape.cy, rotation: shape.rotation || 0 };
+            } else if (shape.type === 'oval') {
+              bbox = { x: shape.cx - shape.rx, y: shape.cy - shape.ry, w: shape.rx * 2, h: shape.ry * 2, cx: shape.cx, cy: shape.cy, rotation: shape.rotation || 0 };
+            } else if (shape.type === 'polygon' && shape.points.length > 0) {
+              const xs = shape.points.map(p => p.x);
+              const ys = shape.points.map(p => p.y);
+              const minX = Math.min(...xs), maxX = Math.max(...xs);
+              const minY = Math.min(...ys), maxY = Math.max(...ys);
+              bbox = { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX)/2, cy: (minY + maxY)/2, rotation: shape.rotation || 0 };
+            }
+            // Drag logic
+            const onShapeMouseDown = (e: React.MouseEvent<SVGElement, MouseEvent>) => {
+              e.stopPropagation();
+              setSelectedShapeId && setSelectedShapeId(shape.id);
+              handleShapeDragStart(shape.id, shape, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+            };
+            // Resize logic (start)
+            const onResizeMouseDown = (corner: string, e: React.MouseEvent<SVGRectElement, MouseEvent>) => {
+              e.stopPropagation();
+              // For all shapes, store initial bbox and mouse
+              setResizingShapeId(shape.id);
+              setResizeShapeStart({
+                mouseX: e.clientX,
+                mouseY: e.clientY,
+                ...bbox,
+                shapeType: shape.type,
+                origShape: shape,
+                corner
+              });
+            };
+            // Render shape
+            let shapeElem = null;
+            if (shape.type === 'rectangle') {
+              shapeElem = <rect
+                x={shape.x}
+                y={shape.y}
+                width={shape.w}
+                height={shape.h}
+                fill={shape.fillColor || '#ddd'}
+                stroke={shape.borderColor || shape.color || '#1976d2'}
+                strokeWidth={shape.borderWidth || (isSelected ? 3 : 2)}
+                style={{ cursor: isSelected ? 'move' : 'pointer' }}
+                onMouseDown={onShapeMouseDown}
+              />;
+            } else if (shape.type === 'circle') {
+              shapeElem = <circle
+                cx={shape.cx}
+                cy={shape.cy}
+                r={shape.r}
+                fill={shape.fillColor || 'none'}
+                stroke={shape.borderColor || shape.color || '#43a047'}
+                strokeWidth={shape.borderWidth || 2}
+                style={{ cursor: isSelected ? 'move' : 'pointer' }}
+                onMouseDown={onShapeMouseDown}
+              />;
+            } else if (shape.type === 'oval') {
+              shapeElem = <ellipse
+                cx={shape.cx}
+                cy={shape.cy}
+                rx={shape.rx}
+                ry={shape.ry}
+                fill={shape.fillColor || 'none'}
+                stroke={shape.borderColor || shape.color || '#fbc02d'}
+                strokeWidth={shape.borderWidth || 2}
+                style={{ cursor: isSelected ? 'move' : 'pointer' }}
+                onMouseDown={onShapeMouseDown}
+              />;
+            } else if (shape.type === 'polygon') {
+              shapeElem = <polygon
+                points={shape.points.map(pt => `${pt.x},${pt.y}`).join(' ')}
+                fill={shape.fillColor || 'none'}
+                stroke={shape.borderColor || shape.color || '#d32f2f'}
+                strokeWidth={shape.borderWidth || 2}
+                style={{ cursor: isSelected ? 'move' : 'pointer' }}
+                onMouseDown={onShapeMouseDown}
+              />;
+            }
+            // Render bounding box and handles if selected
+            let bboxElem = null;
+            if (isSelected && bbox.w > 0 && bbox.h > 0) {
+              // Calculate 4 corners for handles, center, and rotation handle, all rotated if needed
+              const corners = [
+                { x: bbox.x, y: bbox.y, cursor: 'nwse-resize', corner: 'nw' },
+                { x: bbox.x + bbox.w, y: bbox.y, cursor: 'nesw-resize', corner: 'ne' },
+                { x: bbox.x, y: bbox.y + bbox.h, cursor: 'nesw-resize', corner: 'sw' },
+                { x: bbox.x + bbox.w, y: bbox.y + bbox.h, cursor: 'nwse-resize', corner: 'se' },
+              ];
+              // Rotation math
+              const rotatePoint = (px: number, py: number, cx: number, cy: number, angle: number) => {
+                const rad = (angle * Math.PI) / 180;
+                const dx = px - cx;
+                const dy = py - cy;
+                return {
+                  x: cx + dx * Math.cos(rad) - dy * Math.sin(rad),
+                  y: cy + dx * Math.sin(rad) + dy * Math.cos(rad),
+                };
+              };
+              const rot = bbox.rotation || 0;
+              const rotatedCorners = corners.map(c => ({ ...rotatePoint(c.x, c.y, bbox.cx, bbox.cy, rot), cursor: c.cursor, corner: c.corner }));
+              const center = { x: bbox.cx, y: bbox.cy };
+              const rotatedCenter = rotatePoint(center.x, center.y, bbox.cx, bbox.cy, rot);
+              // Rotation handle (above top center)
+              const topCenter = { x: bbox.cx, y: bbox.y };
+              const rotatedTopCenter = rotatePoint(topCenter.x, topCenter.y, bbox.cx, bbox.cy, rot);
+              const rotHandle = rotatePoint(bbox.cx, bbox.y - 32, bbox.cx, bbox.cy, rot);
+              bboxElem = (
+                <g>
+                  {/* Bounding box */}
+                  <rect
+                    x={bbox.x}
+                    y={bbox.y}
+                    width={bbox.w}
+                    height={bbox.h}
+                    fill="none"
+                    stroke="#1976d2"
+                    strokeWidth={2}
+                    pointerEvents="none"
+                    transform={rot ? `rotate(${rot},${bbox.cx},${bbox.cy})` : undefined}
+                  />
+                  {/* 4 handle vuông ở 4 góc */}
+                  {rotatedCorners.map((c, i) => (
+                    <rect key={i} x={c.x - 4} y={c.y - 4} width={8} height={8} fill="#1976d2" style={{ cursor: c.cursor, pointerEvents: 'all' }}
+                      onMouseDown={e => onResizeMouseDown(c.corner, e)} />
+                  ))}
+                  {/* Chấm tròn ở tâm */}
+                  <circle cx={rotatedCenter.x} cy={rotatedCenter.y} r={5} fill="#1976d2" />
+                  {/* Rotation handle */}
+                  <line x1={rotatedTopCenter.x} y1={rotatedTopCenter.y} x2={rotHandle.x} y2={rotHandle.y} stroke="#1976d2" strokeWidth={2} />
+                  <circle cx={rotHandle.x} cy={rotHandle.y} r={7} fill="#1976d2" />
+                </g>
+              );
+            }
+            // Wrap everything in a <g> with rotation if needed
+            const groupTransform = bbox.rotation ? `rotate(${bbox.rotation},${bbox.cx},${bbox.cy})` : undefined;
+            return <g key={shape.id} transform={groupTransform}>{shapeElem}{bboxElem}</g>;
+          })}
+          {/* Render texts attached to shapes (always above shapes) */}
+          {texts.filter(text => text.shapeId).map(text => {
+            const shape = shapes.find(s => s.id === text.shapeId);
+            if (!shape) return null;
+            let x = 0, y = 0, rotation = 0;
+            if (shape.type === 'rectangle') {
+              x = shape.x + shape.w / 2;
+              y = shape.y + shape.h / 2;
+              rotation = shape.rotation || 0;
+            } else if (shape.type === 'circle') {
+              x = shape.cx;
+              y = shape.cy;
+              rotation = shape.rotation || 0;
+            } else if (shape.type === 'oval') {
+              x = shape.cx;
+              y = shape.cy;
+              rotation = shape.rotation || 0;
+            } else if (shape.type === 'polygon' && shape.points.length > 0) {
+              const pts = shape.points;
+              const n = pts.length;
+              x = pts.reduce((sum, p) => sum + p.x, 0) / n;
+              y = pts.reduce((sum, p) => sum + p.y, 0) / n;
+              rotation = shape.rotation || 0;
+            }
+            return (
+              <text
+                key={text.id}
+                x={x}
+                y={y}
+                textAnchor="middle"
+                fontSize={text.fontSize}
+                fill={text.color}
+                fontWeight="bold"
+                style={{ userSelect: 'none', pointerEvents: 'none' }}
+                transform={rotation ? `rotate(${rotation},${x},${y})` : undefined}
+              >
+                {text.content}
+              </text>
+            );
+          })}
+          {/* Render free texts (not attached to shape) */}
+          {texts.filter(text => !text.shapeId).map(text => {
+            const isSelected = selectedTextId === text.id;
+            // Ước lượng bbox
+            const width = (text.content.length * text.fontSize * 0.6) || 40;
+            const height = text.fontSize * 1.2;
+            const x = text.x - width / 2;
+            const y = text.y - height / 2;
+            const rotation = text.rotation || 0;
+            // Tính vị trí rotation handle
+            const handleY = y - 32;
+            return editingText === text.id ? (
+              <foreignObject
+                key={text.id}
+                x={text.x - 60}
+                y={text.y - 16}
+                width={120}
+                height={32}
+                style={{ overflow: 'visible' }}
+              >
+                <input
+                  type="text"
+                  value={text.content}
+                  autoFocus
+                  style={{ width: '100%', fontSize: text.fontSize, fontWeight: 'bold', color: text.color, textAlign: 'center', background: 'rgba(255,255,255,0.9)', border: `1px solid ${text.color}`, borderRadius: 4 }}
+                  onChange={e => onTextChange && onTextChange(text.id, e.target.value)}
+                  onBlur={() => onTextEdit && onTextEdit('')}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') onTextEdit && onTextEdit('');
+                  }}
+                />
+              </foreignObject>
+            ) : (
+              <g key={text.id}>
+                {/* Bounding box + handle nếu được chọn */}
+                {isSelected && (
+                  <g
+                    transform={`rotate(${rotation},${text.x},${text.y})`}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {/* Khung viền */}
+                    <rect
+                      x={x}
+                      y={y}
+                      width={width}
+                      height={height}
+                      fill="none"
+                      stroke="#1976d2"
+                      strokeWidth={1}
+                    />
+                    {/* 4 handle vuông ở 4 góc */}
+                    <rect x={x - 4} y={y - 4} width={8} height={8} fill="#1976d2" style={{ pointerEvents: 'all', cursor: 'nwse-resize' }}
+                      onMouseDown={e => { e.stopPropagation(); handleResizeStart(text.id, e.clientX, e.clientY, text.fontSize); }} />
+                    <rect x={x + width - 4} y={y - 4} width={8} height={8} fill="#1976d2" style={{ pointerEvents: 'all', cursor: 'nesw-resize' }}
+                      onMouseDown={e => { e.stopPropagation(); handleResizeStart(text.id, e.clientX, e.clientY, text.fontSize); }} />
+                    <rect x={x - 4} y={y + height - 4} width={8} height={8} fill="#1976d2" style={{ pointerEvents: 'all', cursor: 'nesw-resize' }}
+                      onMouseDown={e => { e.stopPropagation(); handleResizeStart(text.id, e.clientX, e.clientY, text.fontSize); }} />
+                    <rect x={x + width - 4} y={y + height - 4} width={8} height={8} fill="#1976d2" style={{ pointerEvents: 'all', cursor: 'nwse-resize' }}
+                      onMouseDown={e => { e.stopPropagation(); handleResizeStart(text.id, e.clientX, e.clientY, text.fontSize); }} />
+                    {/* Chấm tròn ở tâm */}
+                    <circle cx={text.x} cy={text.y} r={5} fill="#1976d2" />
+                    {/* Rotation handle */}
+                    <line x1={text.x} y1={y} x2={text.x} y2={handleY} stroke="#1976d2" strokeWidth={2} />
+                    <circle cx={text.x} cy={handleY} r={7} fill="#1976d2" />
+                    {/* Hiển thị fontSize khi resize */}
+                    {resizingTextId === text.id && (
+                      <text x={text.x} y={y - 24} textAnchor="middle" fontSize={14} fill="#1976d2" fontWeight="bold" style={{ userSelect: 'none' }}>{text.fontSize}px</text>
+                    )}
+                  </g>
+                )}
+                <text
+                  x={text.x}
+                  y={text.y}
+                  textAnchor="middle"
+                  fontSize={text.fontSize}
+                  fill={text.color}
+                  fontWeight="bold"
+                  style={{ userSelect: 'none', pointerEvents: 'auto', cursor: 'pointer' }}
+                  transform={`rotate(${text.rotation},${text.x},${text.y})`}
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (onTextClick) onTextClick(text.id);
+                  }}
+                  onDoubleClick={e => {
+                    e.stopPropagation();
+                    if (onTextEdit) onTextEdit(text.id);
+                  }}
+                  onMouseDown={e => {
+                    if (onTextMoveStart) onTextMoveStart(text.id, text.x, text.y, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+                  }}
+                >
+                  {text.content}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+    </div>
+  );
+} 
