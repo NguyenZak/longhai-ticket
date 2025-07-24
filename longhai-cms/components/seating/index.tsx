@@ -3,6 +3,9 @@ import Toolbar from './Toolbar';
 import SidebarLeft from './SidebarLeft';
 import SidebarRight from './SidebarRight';
 import SeatMapEditor from './SeatMapEditor';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import 'svg2pdf.js';
 
 type Shape =
   | { id: string; type: 'rectangle'; x: number; y: number; w: number; h: number; color: string }
@@ -10,11 +13,19 @@ type Shape =
   | { id: string; type: 'oval'; cx: number; cy: number; rx: number; ry: number; color: string }
   | { id: string; type: 'polygon'; points: { x: number; y: number }[]; color: string };
 
-const initialSeats = [
-  { id: 'A1', col: 2, row: 2, label: 'A1' },
-  { id: 'A2', col: 3, row: 2, label: 'A2' },
-  { id: 'B1', col: 2, row: 3, label: 'B1' },
-];
+type Seat = { id: string; x: number; y: number; label: string };
+type SeatGroup = {
+  id: string;
+  type: 'seat-group';
+  seats: Seat[];
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation?: number;
+};
+
+const initialSeats: Seat[] = [];
 
 const initialTexts: { id: string; x: number; y: number; content: string; color: string; rotation: number; fontSize: number; shapeId?: string }[] = [];
 const initialShapes: Shape[] = [];
@@ -24,7 +35,7 @@ export default function SeatingEditorPage() {
   const [height, setHeight] = useState(800);
   const [seats, setSeats] = useState(initialSeats);
   const [activeTool, setActiveTool] = useState('select');
-  const [selected, setSelected] = useState<any>(null);
+  const [selected, setSelected] = useState<{ type: 'seat' | 'group' | 'shape' | 'text'; id: string } | null>(null);
   const [texts, setTexts] = useState<{ id: string; x: number; y: number; content: string; color: string; rotation: number; fontSize: number; shapeId?: string }[]>(initialTexts);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
@@ -34,25 +45,34 @@ export default function SeatingEditorPage() {
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<any[]>([]);
   const [redoStack, setRedoStack] = useState<any[]>([]);
-  // Add clipboard state
-  const [clipboard, setClipboard] = useState<{ type: 'shape' | 'text'; data: any } | null>(null);
+  // Define clipboard type
+  const [clipboard, setClipboard] = useState<{ seats?: Seat[]; groups?: SeatGroup[] } | null>(null);
   // Add zoom state
   const [zoom, setZoom] = useState(1);
   const handleZoomIn = () => setZoom(z => Math.min(z + 0.1, 3));
   const handleZoomOut = () => setZoom(z => Math.max(z - 0.1, 0.1));
   const handleZoomReset = () => setZoom(1);
+  const [gridEnabled, setGridEnabled] = useState(true);
+  const handleGridToggle = () => setGridEnabled(g => !g);
+  const [seatGroups, setSeatGroups] = useState<SeatGroup[]>([]);
+
+  // Accept selectedSeatIds and selectedGroupIds from SeatMapEditor (multi-select)
+  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   // Helper to snapshot current state
   const snapshot = () => ({
     shapes: [...shapes],
     texts: [...texts],
     seats: [...seats],
+    seatGroups: [...seatGroups],
   });
   // Helper to restore state
   const restore = (snap: any) => {
     setShapes(snap.shapes);
     setTexts(snap.texts);
     setSeats(snap.seats);
+    setSeatGroups(snap.seatGroups);
   };
   // Push to undo stack on any change
   const pushUndo = () => setUndoStack(stack => [snapshot(), ...stack].slice(0, 100));
@@ -72,7 +92,7 @@ export default function SeatingEditorPage() {
     restore(next);
   };
 
-  const handleSeatClick = (seat: any) => setSelected({ ...seat, type: 'seat' });
+  const handleSeatClick = (seat: Seat) => setSelected({ type: 'seat', id: seat.id });
   const handleAddSeats = (newSeats: any[]) => { pushUndo(); setSeats(prev => ([...prev, ...newSeats])); };
   const handleAddText = (x: number, y: number) => { pushUndo(); const id = `text-${Date.now()}`; setTexts(prev => ([
       ...prev,
@@ -228,60 +248,102 @@ export default function SeatingEditorPage() {
   // 3. When deleting a shape, also delete its text
   const handleDeleteShape = (shapeId: string) => { pushUndo(); setShapes(prev => prev.filter(s => s.id !== shapeId)); setTexts(prev => prev.filter(t => t.shapeId !== shapeId)); };
 
-  // Cut handler
+  // Update cut/copy/paste/delete handlers
   const handleCut = () => {
-    if (selectedShapeId) {
-      const shape = shapes.find(s => s.id === selectedShapeId);
-      if (shape) {
-        setClipboard({ type: 'shape', data: JSON.parse(JSON.stringify(shape)) });
-        handleDeleteShape(selectedShapeId);
-        setSelectedShapeId(null);
-      }
-    } else if (selectedTextId) {
-      const text = texts.find(t => t.id === selectedTextId);
-      if (text) {
-        setClipboard({ type: 'text', data: JSON.parse(JSON.stringify(text)) });
-        setTexts(prev => prev.filter(t => t.id !== selectedTextId));
-        setSelectedTextId(null);
-      }
+    if (selectedSeatIds.length > 0 || selectedGroupIds.length > 0) {
+      pushUndo();
+      const cutSeats: Seat[] = seats.filter((s: Seat) => selectedSeatIds.includes(s.id));
+      const cutGroups: SeatGroup[] = seatGroups.filter((g: SeatGroup) => selectedGroupIds.includes(g.id));
+      setClipboard({ seats: cutSeats, groups: cutGroups });
+      setSeats(seats.filter((s: Seat) => !selectedSeatIds.includes(s.id)));
+      setSeatGroups(seatGroups.filter((g: SeatGroup) => !selectedGroupIds.includes(g.id)));
+      setSelectedSeatIds([]);
+      setSelectedGroupIds([]);
+      return;
     }
+    if (!selected) return;
+    if (selected.type === 'seat') {
+      const seat = seats.find((s: Seat) => s.id === selected.id);
+      if (seat) {
+        setClipboard({ seats: [seat] });
+        setSeats(seats.filter((s: Seat) => s.id !== selected.id));
+        setSelected(null);
+      }
+      return;
+    }
+    if (selected.type === 'group') {
+      const group = seatGroups.find((g: SeatGroup) => g.id === selected.id);
+      if (group) {
+        setClipboard({ groups: [group] });
+        setSeatGroups(seatGroups.filter((g: SeatGroup) => g.id !== selected.id));
+        setSelected(null);
+      }
+      return;
+    }
+    // For shape/text: skip clipboard for now or implement separately if needed
   };
-  // Copy handler
   const handleCopy = () => {
-    if (selectedShapeId) {
-      const shape = shapes.find(s => s.id === selectedShapeId);
-      if (shape) setClipboard({ type: 'shape', data: JSON.parse(JSON.stringify(shape)) });
-    } else if (selectedTextId) {
-      const text = texts.find(t => t.id === selectedTextId);
-      if (text) setClipboard({ type: 'text', data: JSON.parse(JSON.stringify(text)) });
+    if (selectedSeatIds.length > 0 || selectedGroupIds.length > 0) {
+      const copySeats: Seat[] = seats.filter((s: Seat) => selectedSeatIds.includes(s.id));
+      const copyGroups: SeatGroup[] = seatGroups.filter((g: SeatGroup) => selectedGroupIds.includes(g.id));
+      setClipboard({ seats: copySeats, groups: copyGroups });
+      return;
     }
+    if (!selected) return;
+    if (selected.type === 'seat') {
+      const seat = seats.find((s: Seat) => s.id === selected.id);
+      if (seat) setClipboard({ seats: [seat] });
+      return;
+    }
+    if (selected.type === 'group') {
+      const group = seatGroups.find((g: SeatGroup) => g.id === selected.id);
+      if (group) setClipboard({ groups: [group] });
+      return;
+    }
+    // For shape/text: skip clipboard for now or implement separately if needed
   };
-  // Paste handler
   const handlePaste = () => {
-    if (clipboard) {
-      if (clipboard.type === 'shape') {
-        const shape = { ...clipboard.data, id: `${clipboard.data.type}-${Date.now()}` };
-        if (shape.type === 'rectangle') shape.x += 20, shape.y += 20;
-        if (shape.type === 'circle' || shape.type === 'oval') shape.cx += 20, shape.cy += 20;
-        if (shape.type === 'polygon') shape.points = shape.points.map((pt: any) => ({ x: pt.x + 20, y: pt.y + 20 }));
-        handleAddShape(shape);
-        setSelectedShapeId(shape.id);
-      } else if (clipboard.type === 'text') {
-        const text = { ...clipboard.data, id: `text-${Date.now()}`, x: clipboard.data.x + 20, y: clipboard.data.y + 20 };
-        setTexts(prev => [...prev, text]);
-        setSelectedTextId(text.id);
-      }
+    if (clipboard && (clipboard.seats?.length || clipboard.groups?.length)) {
+      pushUndo();
+      const offset = 30;
+      const newSeats: Seat[] = (clipboard.seats || []).map((s: Seat) => ({ ...s, id: `seat-${Date.now()}-${Math.random()}`, x: s.x + offset, y: s.y + offset }));
+      const newGroups: SeatGroup[] = (clipboard.groups || []).map((g: SeatGroup) => ({
+        ...g,
+        id: `group-${Date.now()}-${Math.random()}`,
+        seats: g.seats.map((s: Seat) => ({ ...s, id: `seat-${Date.now()}-${Math.random()}`, x: s.x + offset, y: s.y + offset })),
+        x: g.x + offset,
+        y: g.y + offset,
+      }));
+      setSeats([...seats, ...newSeats]);
+      setSeatGroups([...seatGroups, ...newGroups]);
+      setSelectedSeatIds(newSeats.map((s: Seat) => s.id));
+      setSelectedGroupIds(newGroups.map((g: SeatGroup) => g.id));
+      return;
     }
+    // For shape/text: skip clipboard for now or implement separately if needed
   };
-  // Delete handler
   const handleDelete = () => {
-    if (selectedShapeId) {
-      handleDeleteShape(selectedShapeId);
-      setSelectedShapeId(null);
-    } else if (selectedTextId) {
-      setTexts(prev => prev.filter(t => t.id !== selectedTextId));
-      setSelectedTextId(null);
+    if (selectedSeatIds.length > 0 || selectedGroupIds.length > 0) {
+      pushUndo();
+      setSeats(seats.filter((s: Seat) => !selectedSeatIds.includes(s.id)));
+      setSeatGroups(seatGroups.filter((g: SeatGroup) => !selectedGroupIds.includes(g.id)));
+      setSelectedSeatIds([]);
+      setSelectedGroupIds([]);
+      return;
     }
+    if (!selected) return;
+    pushUndo();
+    if (selected.type === 'seat') {
+      setSeats(seats.filter((s: Seat) => s.id !== selected.id));
+      setSelected(null);
+      return;
+    }
+    if (selected.type === 'group') {
+      setSeatGroups(seatGroups.filter((g: SeatGroup) => g.id !== selected.id));
+      setSelected(null);
+      return;
+    }
+    // For shape/text: skip for now or implement separately if needed
   };
 
   const expandGrid = (step = 100) => {
@@ -323,6 +385,117 @@ export default function SeatingEditorPage() {
     }
   };
 
+  const renderExportSVG = () => {
+    // Build SVG string for only seats, shapes, texts
+    const seatCircles = seats.map(seat =>
+      `<g><circle r="10" cx="${seat.x}" cy="${seat.y}" fill="#1976d2" />
+        <text x="${seat.x}" y="${seat.y}" text-anchor="middle" alignment-baseline="central" font-size="8" fill="#fff">${seat.label}</text>
+      </g>`
+    ).join('');
+    const shapeSvgs = shapes.map(shape => {
+      if (shape.type === 'rectangle') {
+        const fill = (shape as any).fillColor || shape.color || '#ddd';
+        const stroke = (shape as any).borderColor || shape.color || '#1976d2';
+        return `<rect x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}" fill="${fill}" stroke="${stroke}" stroke-width="2" />`;
+      } else if (shape.type === 'circle') {
+        const fill = (shape as any).fillColor || shape.color || 'none';
+        const stroke = (shape as any).borderColor || shape.color || '#43a047';
+        return `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}" fill="${fill}" stroke="${stroke}" stroke-width="2" />`;
+      } else if (shape.type === 'oval') {
+        const fill = (shape as any).fillColor || shape.color || 'none';
+        const stroke = (shape as any).borderColor || shape.color || '#fbc02d';
+        return `<ellipse cx="${shape.cx}" cy="${shape.cy}" rx="${shape.rx}" ry="${shape.ry}" fill="${fill}" stroke="${stroke}" stroke-width="2" />`;
+      } else if (shape.type === 'polygon') {
+        const fill = (shape as any).fillColor || shape.color || 'none';
+        const stroke = (shape as any).borderColor || shape.color || '#d32f2f';
+        return `<polygon points="${shape.points.map(pt => `${pt.x},${pt.y}`).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="2" />`;
+      }
+      return '';
+    }).join('');
+    const textSvgs = texts.filter(t => !t.shapeId).map(text => {
+      const width = (text.content.length * text.fontSize * 0.6) || 40;
+      const height = text.fontSize * 1.2;
+      return `<text x="${text.x}" y="${text.y}" text-anchor="middle" font-size="${text.fontSize}" fill="${text.color}" font-weight="bold">${text.content}</text>`;
+    }).join('');
+    // SVG wrapper
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <g>${seatCircles}${shapeSvgs}${textSvgs}</g>
+    </svg>`;
+  };
+
+  const handleExportPdf = async () => {
+    const svgString = renderExportSVG();
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'px', format: [width, height] });
+    // Create a DOM element from SVG string
+    const svgEl = new window.DOMParser().parseFromString(svgString, 'image/svg+xml').documentElement;
+    // @ts-ignore
+    await doc.svg(svgEl, { x: 0, y: 0, width, height });
+    doc.save('seating-plan-vector.pdf');
+  };
+
+  const handleExportSvg = () => {
+    const svgString = renderExportSVG();
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'seating-plan.svg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleAddSeatGroup = (seats: Seat[]) => {
+    if (seats.length === 0) return;
+    // Không group by row nữa, mỗi seats là một group
+    const xs = seats.map(s => s.x);
+    const ys = seats.map(s => s.y);
+    const minX = Math.min(...xs) - 10;
+    const maxX = Math.max(...xs) + 10;
+    const minY = Math.min(...ys) - 10;
+    const maxY = Math.max(...ys) + 10;
+    const groupId = `group-${Date.now()}-${Math.random()}`;
+    setSeatGroups(prev => [
+      ...prev,
+      {
+        id: groupId,
+        type: 'seat-group',
+        seats,
+        x: minX,
+        y: minY,
+        w: maxX - minX,
+        h: maxY - minY,
+      },
+    ]);
+    setSelected({ type: 'group', id: groupId });
+  };
+
+  const handleUpdateSeatGroup = (groupId: string, dx: number, dy: number) => {
+    setSeatGroups(prev => prev.map(g => {
+      if (g.id !== groupId) return g;
+      // Snap dx, dy to grid (25px)
+      const dX = Math.round(dx / 25) * 25;
+      const dY = Math.round(dy / 25) * 25;
+      const newX = g.x + dX;
+      const newY = g.y + dY;
+      return {
+        ...g,
+        x: newX,
+        y: newY,
+        seats: g.seats.map(s => ({
+          ...s,
+          x: s.x + dX,
+          y: s.y + dY,
+        })),
+      };
+    }));
+  };
+
+  const handleUpdateSeatGroupRotation = (groupId: string, angle: number) => {
+    setSeatGroups(prev => prev.map(g =>
+      g.id === groupId ? { ...g, rotation: angle } : g
+    ));
+  };
+
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -334,6 +507,10 @@ export default function SeatingEditorPage() {
         setActiveTool('pan');
         e.preventDefault();
       }
+      if (e.key === 'v' || e.key === 'V') {
+        setActiveTool('select');
+        e.preventDefault();
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         if (e.shiftKey) {
           handleRedo();
@@ -342,10 +519,47 @@ export default function SeatingEditorPage() {
         }
         e.preventDefault();
       }
+      // Cut
+      if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+        handleCut();
+        e.preventDefault();
+        return;
+      }
+      // Copy
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        handleCopy();
+        e.preventDefault();
+        return;
+      }
+      // Paste
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        handlePaste();
+        e.preventDefault();
+        return;
+      }
+      // Delete
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        handleDelete();
+        e.preventDefault();
+        return;
+      }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [undoStack, redoStack]);
+  }, [undoStack, redoStack, selected, clipboard, seats, seatGroups, shapes, texts, selectedSeatIds, selectedGroupIds]);
+
+  // Add selectedSeat and selectedGroupId for SeatMapEditor
+  const selectedSeat = selected?.type === 'seat' ? seats.find(s => s.id === selected.id) : null;
+  const selectedGroupId = selected?.type === 'group' ? selected.id : null;
+
+  // Implement handleGroupClick
+  const handleGroupClick = (groupId: string) => setSelected({ type: 'group', id: groupId });
+
+  // Update toolbar button enable/disable logic
+  const canCut = selectedSeatIds.length > 0 || selectedGroupIds.length > 0 || selected;
+  const canCopy = canCut;
+  const canDelete = canCut;
+  const canPaste = clipboard && (clipboard.seats?.length || clipboard.groups?.length);
 
   return (
     <div ref={mainRef} className="flex flex-col h-screen w-screen bg-gray-100">
@@ -365,6 +579,10 @@ export default function SeatingEditorPage() {
         onCenter={handleCenter}
         onPan={handlePan}
         onFullscreen={handleFullscreen}
+        onExportPdf={handleExportPdf}
+        onExportSvg={handleExportSvg}
+        onGridToggle={handleGridToggle}
+        gridEnabled={gridEnabled}
       />
       
       <div className="flex flex-1 overflow-hidden">
@@ -375,7 +593,7 @@ export default function SeatingEditorPage() {
               canvasWidth={width}
               canvasHeight={height}
               onSeatClick={handleSeatClick}
-              selected={selected}
+              selected={selectedSeat}
               activeTool={activeTool}
               onAddSeats={handleAddSeats}
               texts={texts}
@@ -397,6 +615,15 @@ export default function SeatingEditorPage() {
               setSelectedTextId={setSelectedTextId}
               zoom={zoom}
               onCenterPan={setCenterPan}
+              gridEnabled={gridEnabled}
+              seatGroups={seatGroups}
+              onAddSeatGroup={handleAddSeatGroup}
+              selectedGroupId={selectedGroupId}
+              setSelectedGroupId={id => setSelected(id ? { type: 'group', id } : null)}
+              onUpdateSeatGroup={handleUpdateSeatGroup}
+              onUpdateSeatGroupRotation={handleUpdateSeatGroupRotation}
+              onSelectSeats={setSelectedSeatIds}
+              onSelectGroups={setSelectedGroupIds}
             />
          
         </main>

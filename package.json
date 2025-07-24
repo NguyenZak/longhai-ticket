@@ -7,6 +7,10 @@
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",
     "axios": "^1.10.0",
-    "date-fns": "^4.1.0"
+    "date-fns": "^4.1.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
+    "pdf-lib": "^1.17.1",
+    "svg2pdf.js": "^2.5.0"
   }
 }
