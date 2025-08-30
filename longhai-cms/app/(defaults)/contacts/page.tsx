@@ -28,6 +28,7 @@ const PAGE_SIZES = [10, 20, 30, 50, 100];
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [initialRecords, setInitialRecords] = useState<Contact[]>([]);
@@ -43,9 +44,32 @@ export default function ContactsPage() {
   }, []);
 
   const fetchContacts = async () => {
-    const res = await apiCall("/contacts");
-    setContacts(res.data || []);
-    setInitialRecords(sortBy(res.data || [], "id").reverse());
+    try {
+      setLoading(true);
+      const res = await apiCall("/contacts");
+      console.log('Contacts data:', res.data);
+      
+      // Validate and clean the data
+      const validContacts = (res.data || []).map((contact: any) => ({
+        id: contact.id || 0,
+        name: contact.name || '',
+        phone: contact.phone || '',
+        email: contact.email || '',
+        subject: contact.subject || '',
+        message: contact.message || '',
+        status: contact.status || 'chua_xu_ly',
+        created_at: contact.created_at || new Date().toISOString()
+      }));
+      
+      setContacts(validContacts);
+      setInitialRecords(sortBy(validContacts, "id").reverse());
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+      setContacts([]);
+      setInitialRecords([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -55,7 +79,9 @@ export default function ContactsPage() {
   useEffect(() => {
     const from = (page - 1) * pageSize;
     const to = from + pageSize;
-    setRecordsData([...initialRecords.slice(from, to)]);
+    const slicedData = initialRecords.slice(from, to);
+    console.log('Records data being passed to DataTable:', slicedData);
+    setRecordsData(slicedData);
   }, [page, pageSize, initialRecords]);
 
   useEffect(() => {
@@ -184,10 +210,19 @@ export default function ContactsPage() {
         <input type="text" className="form-input w-auto" placeholder="Tìm kiếm..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <div className="datatables">
-        <DataTable
-          highlightOnHover
-          className="table-hover whitespace-nowrap"
-          records={recordsData}
+        {loading ? (
+          <div className="text-center py-8">
+            <p>Đang tải dữ liệu...</p>
+          </div>
+        ) : recordsData.length === 0 ? (
+          <div className="text-center py-8">
+            <p>Không có dữ liệu liên hệ</p>
+          </div>
+        ) : (
+          <DataTable
+            highlightOnHover
+            className="table-hover whitespace-nowrap"
+            records={recordsData}
           columns={[
             { accessor: 'id', title: '#', sortable: true },
             { accessor: 'name', title: 'Họ tên', sortable: true },
@@ -234,6 +269,7 @@ export default function ContactsPage() {
           minHeight={200}
           paginationText={({ from, to, totalRecords }) => `Hiển thị ${from} đến ${to} trên tổng ${totalRecords} liên hệ`}
         />
+        )}
       </div>
     </div>
   );

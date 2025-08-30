@@ -14,7 +14,6 @@ const TOOLBAR_GROUPS = [
   [
     { key: 'select', icon: '/icons/tool-select.svg', tooltip: 'Select' },
     { key: 'select-seat', icon: '/icons/tool-select-seat.svg', tooltip: 'Select Seat' },
-    { key: 'seat', icon: '/icons/tool-seat.svg', tooltip: 'Add Seat' },
     { key: 'row', icon: '/icons/tool-row.svg', tooltip: 'Row' },
     { key: 'rows', icon: '/icons/tool-rows.svg', tooltip: 'Rows & Column' },
     { key: 'text', icon: '/icons/tool-text.svg', tooltip: 'Text' },
@@ -47,9 +46,36 @@ const TOOLBAR_GROUPS = [
     { key: 'center', icon: '/icons/tool-center.svg', tooltip: 'Center' },
     { key: 'pan', icon: '/icons/tool-pan.svg', tooltip: 'Pan' },
   ],
+  [
+    { key: 'help', icon: '/icons/tool-help.svg', tooltip: 'Keyboard Shortcuts' },
+  ],
 ];
 
-export default function Toolbar({ activeTool, onToolSelect, onUndo, onRedo, onCut, onCopy, onPaste, onDelete, zoom, onZoomIn, onZoomOut, onZoomReset, onCenter, onPan, onFullscreen, onExportPdf, onExportSvg, onGridToggle, gridEnabled }: {
+export default function Toolbar({ 
+  activeTool, 
+  onToolSelect, 
+  onUndo, 
+  onRedo, 
+  onCut, 
+  onCopy, 
+  onPaste, 
+  onDelete, 
+  zoom, 
+  onZoomIn, 
+  onZoomOut, 
+  onZoomReset, 
+  onCenter, 
+  onPan, 
+  onFullscreen, 
+  onExportPdf, 
+  onExportSvg, 
+  onGridToggle, 
+  gridEnabled, 
+  onHelp,
+  onSave,
+  onOpen,
+  onValidate
+}: {
   activeTool: string;
   onToolSelect?: (tool: string) => void;
   onUndo?: () => void;
@@ -69,6 +95,10 @@ export default function Toolbar({ activeTool, onToolSelect, onUndo, onRedo, onCu
   onExportSvg?: () => void;
   onGridToggle?: () => void;
   gridEnabled?: boolean;
+  onHelp?: () => void;
+  onSave?: () => void;
+  onOpen?: () => void;
+  onValidate?: () => void;
 }) {
   return (
     <div className="c-toolbar flex flex-row items-center bg-white border-b border-gray-200 px-2 py-1 shadow-sm overflow-x-auto">
@@ -81,6 +111,45 @@ export default function Toolbar({ activeTool, onToolSelect, onUndo, onRedo, onCu
           }
         >
           {group.map(tool => {
+            if (tool.key === 'file') {
+              return (
+                <button
+                  key={tool.key}
+                  className="bunt-icon-button mx-1 p-1 rounded-full transition hover:bg-gray-100 hover:border-gray-400 border border-transparent"
+                  onClick={onOpen}
+                  title={tool.tooltip}
+                  type="button"
+                >
+                  <img src={tool.icon} alt={tool.key} width={24} height={24} style={{ display: 'block' }} />
+                </button>
+              );
+            }
+            if (tool.key === 'open-file') {
+              return (
+                <button
+                  key={tool.key}
+                  className="bunt-icon-button mx-1 p-1 rounded-full transition hover:bg-gray-100 hover:border-gray-400 border border-transparent"
+                  onClick={onOpen}
+                  title={tool.tooltip}
+                  type="button"
+                >
+                  <img src={tool.icon} alt={tool.key} width={24} height={24} style={{ display: 'block' }} />
+                </button>
+              );
+            }
+            if (tool.key === 'save-file') {
+              return (
+                <button
+                  key={tool.key}
+                  className="bunt-icon-button mx-1 p-1 rounded-full transition hover:bg-gray-100 hover:border-gray-400 border border-transparent"
+                  onClick={onSave}
+                  title={tool.tooltip}
+                  type="button"
+                >
+                  <img src={tool.icon} alt={tool.key} width={24} height={24} style={{ display: 'block' }} />
+                </button>
+              );
+            }
             if (tool.key === 'export-pdf') {
               return (
                 <button
@@ -104,6 +173,19 @@ export default function Toolbar({ activeTool, onToolSelect, onUndo, onRedo, onCu
                   type="button"
                 >
                   <img src={tool.icon || '/icons/tool-export-svg.svg'} alt={tool.key} width={24} height={24} style={{ display: 'block' }} />
+                </button>
+              );
+            }
+            if (tool.key === 'validate') {
+              return (
+                <button
+                  key={tool.key}
+                  className="bunt-icon-button mx-1 p-1 rounded-full transition hover:bg-gray-100 hover:border-gray-400 border border-transparent"
+                  onClick={onValidate}
+                  title={tool.tooltip}
+                  type="button"
+                >
+                  <img src={tool.icon} alt={tool.key} width={24} height={24} style={{ display: 'block' }} />
                 </button>
               );
             }
@@ -270,6 +352,19 @@ export default function Toolbar({ activeTool, onToolSelect, onUndo, onRedo, onCu
                   className={`bunt-icon-button mx-1 p-1 rounded-full transition ${activeTool === 'pan' ? 'bg-blue-100 border-2 border-blue-500 shadow-md hover:bg-blue-200 hover:border-blue-700' : 'hover:bg-gray-100 hover:border-gray-400 border border-transparent'}`}
                   onClick={onPan}
                   title={tool.tooltip + ' (H)'}
+                  type="button"
+                >
+                  <img src={tool.icon} alt={tool.key} width={24} height={24} style={{ display: 'block' }} />
+                </button>
+              );
+            }
+            if (tool.key === 'help') {
+              return (
+                <button
+                  key={tool.key}
+                  className="bunt-icon-button mx-1 p-1 rounded-full transition hover:bg-gray-100 hover:border-gray-400 border border-transparent"
+                  onClick={onHelp}
+                  title={tool.tooltip + ' (?)'}
                   type="button"
                 >
                   <img src={tool.icon} alt={tool.key} width={24} height={24} style={{ display: 'block' }} />

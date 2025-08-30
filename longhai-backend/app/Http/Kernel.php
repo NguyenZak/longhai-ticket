@@ -68,5 +68,6 @@ class Kernel extends HttpKernel
         // Custom middleware
         'permission' => \App\Http\Middleware\CheckPermission::class,
         'role' => \App\Http\Middleware\CheckRole::class,
+        'booking.rate.limit' => \App\Http\Middleware\BookingRateLimiter::class,
     ];
 } 

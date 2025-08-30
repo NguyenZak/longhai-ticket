@@ -34,11 +34,14 @@ export default function BannerList() {
   const fetchBanners = async () => {
     try {
       setLoading(true);
+      console.log('🔧 BannerList: Fetching banners...');
       const response = await apiCall('/banners/all');
+      console.log('🔧 BannerList: Response:', response);
       if (response.success) {
         setBanners(response.data);
       }
     } catch (err: any) {
+      console.error('🔧 BannerList: Error:', err);
       setError(err.message || 'Lỗi khi tải danh sách banner');
     } finally {
       setLoading(false);

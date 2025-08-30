@@ -126,7 +126,7 @@ const DashboardStats = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Vé bán hôm nay</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatNumber(tickets_sold_today ?? 0)}
+                {formatNumber(stats.overview.total_tickets ?? 0)}
               </p>
             </div>
           </div>
@@ -142,7 +142,7 @@ const DashboardStats = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Doanh thu hôm nay</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatCurrency(revenue_today ?? 0)}
+                {formatCurrency(stats.overview.total_revenue ?? 0)}
               </p>
             </div>
           </div>
@@ -158,7 +158,7 @@ const DashboardStats = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Khách mới hôm nay</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatNumber(new_customers_today ?? 0)}
+                {formatNumber(stats.overview.total_users ?? 0)}
               </p>
             </div>
           </div>
@@ -174,12 +174,12 @@ const DashboardStats = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Doanh thu tháng</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatCurrency(revenue_month ?? 0)}
+                {formatCurrency(stats.overview.total_revenue ?? 0)}
               </p>
             </div>
           </div>
         </div>
-        {typeof visits_today === 'number' && (
+        {stats.overview.total_events > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-pink-100 dark:bg-pink-900/20">
@@ -189,15 +189,15 @@ const DashboardStats = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Truy cập hôm nay</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Sự kiện hiện tại</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {formatNumber(visits_today)}
+                  {formatNumber(stats.overview.total_events)}
                 </p>
               </div>
             </div>
           </div>
         )}
-        {typeof visits_month === 'number' && (
+        {stats.overview.total_bookings > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900/20">
@@ -207,9 +207,9 @@ const DashboardStats = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Truy cập tháng</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đặt vé hiện tại</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {formatNumber(visits_month)}
+                  {formatNumber(stats.overview.total_bookings)}
                 </p>
               </div>
             </div>
@@ -357,86 +357,110 @@ const DashboardStats = () => {
       {/* Biểu đồ doanh thu ngày */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm mt-6">
         <h3 className="text-lg font-semibold mb-4">Biểu đồ doanh thu ngày</h3>
-        <ReactApexChart
-          type="line"
-          height={300}
-          series={[
-            {
-              name: 'Doanh thu',
-              data: (stats?.daily_revenue_chart?.data || stats?.daily_revenue_chart.data),
-            },
-          ]}
-          options={{
-            chart: { id: 'daily-revenue' },
-            xaxis: { categories: (stats?.daily_revenue_chart?.labels || stats?.daily_revenue_chart.labels) },
-            yaxis: { labels: { formatter: formatCurrency } },
-            stroke: { curve: 'smooth' },
-            colors: ['#1B55E2'],
-          }}
-        />
+        {revenueChart ? (
+          <ReactApexChart
+            type="line"
+            height={300}
+            series={[
+              {
+                name: 'Doanh thu',
+                data: revenueChart.data || [],
+              },
+            ]}
+            options={{
+              chart: { id: 'daily-revenue' },
+              xaxis: { categories: revenueChart.labels || [] },
+              yaxis: { labels: { formatter: formatCurrency } },
+              stroke: { curve: 'smooth' },
+              colors: ['#1B55E2'],
+            }}
+          />
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+            Không có dữ liệu biểu đồ doanh thu
+          </p>
+        )}
       </div>
 
       {/* Biểu đồ doanh thu tháng */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm mt-6">
         <h3 className="text-lg font-semibold mb-4">Biểu đồ doanh thu tháng</h3>
-        <ReactApexChart
-          type="bar"
-          height={300}
-          series={[
-            {
-              name: 'Doanh thu',
-              data: (stats?.monthly_revenue_chart?.data || stats?.monthly_revenue_chart.data),
-            },
-          ]}
-          options={{
-            chart: { id: 'monthly-revenue' },
-            xaxis: { categories: (stats?.monthly_revenue_chart?.labels || stats?.monthly_revenue_chart.labels) },
-            yaxis: { labels: { formatter: formatCurrency } },
-            colors: ['#805dca'],
-          }}
-        />
+        {revenueChart ? (
+          <ReactApexChart
+            type="bar"
+            height={300}
+            series={[
+              {
+                name: 'Doanh thu',
+                data: revenueChart.data || [],
+              },
+            ]}
+            options={{
+              chart: { id: 'monthly-revenue' },
+              xaxis: { categories: revenueChart.labels || [] },
+              yaxis: { labels: { formatter: formatCurrency } },
+              colors: ['#805dca'],
+            }}
+          />
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+            Không có dữ liệu biểu đồ doanh thu tháng
+          </p>
+        )}
       </div>
 
       {/* Biểu đồ doanh thu tổng hợp (theo tháng) */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm mt-6">
         <h3 className="text-lg font-semibold mb-4">Biểu đồ tổng doanh thu</h3>
-        <ReactApexChart
-          type="area"
-          height={300}
-          series={[
-            {
-              name: 'Doanh thu',
-              data: (revenueChart?.data || revenueChart.data),
-            },
-          ]}
-          options={{
-            chart: { id: 'revenue-chart' },
-            xaxis: { categories: (revenueChart?.labels || revenueChart.labels) },
-            yaxis: { labels: { formatter: formatCurrency } },
-            colors: ['#00ab55'],
-          }}
-        />
+        {revenueChart ? (
+          <ReactApexChart
+            type="area"
+            height={300}
+            series={[
+              {
+                name: 'Doanh thu',
+                data: revenueChart.data || [],
+              },
+            ]}
+            options={{
+              chart: { id: 'revenue-chart' },
+              xaxis: { categories: revenueChart.labels || [] },
+              yaxis: { labels: { formatter: formatCurrency } },
+              colors: ['#00ab55'],
+            }}
+          />
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+            Không có dữ liệu biểu đồ tổng doanh thu
+          </p>
+        )}
       </div>
 
       {/* Biểu đồ số lượng đặt vé theo tháng */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm mt-6">
         <h3 className="text-lg font-semibold mb-4">Biểu đồ số lượng đặt vé</h3>
-        <ReactApexChart
-          type="bar"
-          height={300}
-          series={[
-            {
-              name: 'Đặt vé',
-              data: (bookingChart?.data || bookingChart.data),
-            },
-          ]}
-          options={{
-            chart: { id: 'booking-chart' },
-            xaxis: { categories: (bookingChart?.labels || bookingChart.labels) },
-            yaxis: { labels: { formatter: formatNumber } },
-            colors: ['#e7515a'],
-          }}
-        />
+        {bookingChart ? (
+          <ReactApexChart
+            type="bar"
+            height={300}
+            series={[
+              {
+                name: 'Đặt vé',
+                data: bookingChart.data || [],
+              },
+            ]}
+            options={{
+              chart: { id: 'booking-chart' },
+              xaxis: { categories: bookingChart.labels || [] },
+              yaxis: { labels: { formatter: formatNumber } },
+              colors: ['#e7515a'],
+            }}
+          />
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+            Không có dữ liệu biểu đồ đặt vé
+          </p>
+        )}
       </div>
     </div>
   );

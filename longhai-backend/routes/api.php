@@ -86,12 +86,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/tickets/{id}', [TicketController::class, 'destroy']);
     Route::get('/tickets/types', [TicketController::class, 'getTicketTypes']);
 
-    // Bookings
+    // Booking Management with Rate Limiting
     Route::get('/bookings', [BookingController::class, 'index']);
+    Route::post('/bookings', [BookingController::class, 'store'])->middleware('booking.rate.limit');
     Route::get('/bookings/{id}', [BookingController::class, 'show']);
-    Route::post('/bookings', [BookingController::class, 'store']);
     Route::put('/bookings/{id}', [BookingController::class, 'update']);
     Route::delete('/bookings/{id}', [BookingController::class, 'destroy']);
+    Route::post('/bookings/{id}/confirm', [BookingController::class, 'confirmBooking']);
+    Route::post('/bookings/{id}/cancel', [BookingController::class, 'cancelBooking']);
 
     // Users (Admin only)
     Route::middleware('permission:manage_users')->group(function () {
@@ -125,7 +127,14 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Export seats
         Route::get('/{eventId}/export', [SeatingController::class, 'exportSeats']);
+        
+        // Lock/unlock seats for selection
+        Route::post('/{eventId}/lock', [SeatingController::class, 'lockSeats']);
+        Route::post('/{eventId}/unlock', [SeatingController::class, 'unlockSeats']);
     });
+    
+    // Cleanup expired locks
+    Route::post('/seats/cleanup-locks', [SeatingController::class, 'cleanupExpiredLocks']);
 
     // Scrumboard Management
     Route::prefix('scrumboard')->group(function () {

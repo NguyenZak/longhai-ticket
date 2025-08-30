@@ -472,4 +472,156 @@ class SeatingController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Lock seats for selection (temporary reservation)
+     */
+    public function lockSeats(Request $request, string $eventId): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'seat_ids' => 'required|array|min:1|max:10',
+                'seat_ids.*' => 'required|exists:seats,id',
+                'session_id' => 'required|string|max:255',
+                'lock_duration' => 'nullable|integer|min:60|max:1800' // 1-30 minutes
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dữ liệu không hợp lệ',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $lockDuration = $request->input('lock_duration', 300); // Default 5 minutes
+            $sessionId = $request->input('session_id');
+
+            // Check if seats are available
+            $seats = Seat::whereIn('id', $request->seat_ids)
+                ->where('event_id', $eventId)
+                ->get();
+
+            if ($seats->count() !== count($request->seat_ids)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Một số ghế không tồn tại'
+                ], 404);
+            }
+
+            $unavailableSeats = $seats->where('status', '!=', 'available');
+            if ($unavailableSeats->count() > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Một số ghế đã được đặt hoặc đang được chọn',
+                    'unavailable_seats' => $unavailableSeats->pluck('id')->toArray()
+                ], 409);
+            }
+
+            // Lock seats
+            Seat::whereIn('id', $request->seat_ids)->update([
+                'status' => 'reserved',
+                'locked_by' => $sessionId,
+                'locked_at' => now(),
+                'lock_expires_at' => now()->addSeconds($lockDuration)
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã khóa ghế thành công',
+                'data' => [
+                    'locked_seats' => $request->seat_ids,
+                    'lock_expires_at' => now()->addSeconds($lockDuration)->toISOString(),
+                    'lock_duration' => $lockDuration
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lỗi khi khóa ghế: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Unlock seats
+     */
+    public function unlockSeats(Request $request, string $eventId): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'seat_ids' => 'required|array|min:1',
+                'seat_ids.*' => 'required|exists:seats,id',
+                'session_id' => 'required|string|max:255'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dữ liệu không hợp lệ',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $sessionId = $request->input('session_id');
+
+            // Unlock seats (only if locked by the same session)
+            $unlockedCount = Seat::whereIn('id', $request->seat_ids)
+                ->where('event_id', $eventId)
+                ->where('locked_by', $sessionId)
+                ->where('status', 'reserved')
+                ->update([
+                    'status' => 'available',
+                    'locked_by' => null,
+                    'locked_at' => null,
+                    'lock_expires_at' => null
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Đã mở khóa {$unlockedCount} ghế",
+                'data' => [
+                    'unlocked_count' => $unlockedCount
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lỗi khi mở khóa ghế: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Clean up expired locks (should be called by a scheduled job)
+     */
+    public function cleanupExpiredLocks(): JsonResponse
+    {
+        try {
+            $expiredLocks = Seat::where('status', 'reserved')
+                ->where('lock_expires_at', '<', now())
+                ->update([
+                    'status' => 'available',
+                    'locked_by' => null,
+                    'locked_at' => null,
+                    'lock_expires_at' => null
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Đã dọn dẹp {$expiredLocks} khóa hết hạn",
+                'data' => [
+                    'cleaned_count' => $expiredLocks
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lỗi khi dọn dẹp khóa: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 } 

@@ -1,19 +1,21 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Toolbar from './Toolbar';
-import SidebarLeft from './SidebarLeft';
-import SidebarRight from './SidebarRight';
-import SeatMapEditor from './SeatMapEditor';
+import SeatingEditor from './SeatingEditor';
+import type { SeatingEditorHandle } from './types';
+import PropertiesPanel from './PropertiesPanel';
+import StatusBar from './StatusBar';
+import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
+import { useSeatingRedux } from './hooks/useSeatingRedux';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useFileOperations } from './hooks/useFileOperations';
+import { useClipboardOperations } from './hooks/useClipboardOperations';
+import { SelectionItem, ToolType, Shape, Seat, Row, TextElement } from './types';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import 'svg2pdf.js';
+import './seating-editor.css';
 
-type Shape =
-  | { id: string; type: 'rectangle'; x: number; y: number; w: number; h: number; color: string }
-  | { id: string; type: 'circle'; cx: number; cy: number; r: number; color: string }
-  | { id: string; type: 'oval'; cx: number; cy: number; rx: number; ry: number; color: string }
-  | { id: string; type: 'polygon'; points: { x: number; y: number }[]; color: string };
 
-type Seat = { id: string; x: number; y: number; label: string };
 type SeatGroup = {
   id: string;
   type: 'seat-group';
@@ -25,6 +27,16 @@ type SeatGroup = {
   rotation?: number;
 };
 
+interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  cx: number;
+  cy: number;
+  rotation?: number;
+}
+
 const initialSeats: Seat[] = [];
 
 const initialTexts: { id: string; x: number; y: number; content: string; color: string; rotation: number; fontSize: number; shapeId?: string }[] = [];
@@ -34,9 +46,11 @@ export default function SeatingEditorPage() {
   const [width, setWidth] = useState(800);
   const [height, setHeight] = useState(800);
   const [seats, setSeats] = useState(initialSeats);
-  const [activeTool, setActiveTool] = useState('select');
+  const [rows, setRows] = useState<Row[]>([]);
+
+  const [activeTool, setActiveTool] = useState<'select' | 'row' | 'rows' | 'zone' | 'pan' | 'text' | 'rectangle' | 'circle' | 'oval' | 'polygon'>('select');
   const [selected, setSelected] = useState<{ type: 'seat' | 'group' | 'shape' | 'text'; id: string } | null>(null);
-  const [texts, setTexts] = useState<{ id: string; x: number; y: number; content: string; color: string; rotation: number; fontSize: number; shapeId?: string }[]>(initialTexts);
+  const [texts, setTexts] = useState<TextElement[]>(initialTexts);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
   const [draggingTextId, setDraggingTextId] = useState<string | null>(null);
@@ -59,6 +73,139 @@ export default function SeatingEditorPage() {
   // Accept selectedSeatIds and selectedGroupIds from SeatMapEditor (multi-select)
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showRowSettings, setShowRowSettings] = useState(false);
+
+  // Add unified multi-selection system like pretix
+  const [selectionItems, setSelectionItems] = useState<SelectionItem[]>([]);
+  const [selectionBoundary, setSelectionBoundary] = useState<BoundingBox | null>(null);
+  const [isRotating, setIsRotating] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeCorner, setResizeCorner] = useState<string>('');
+  const [rotateOrigin, setRotateOrigin] = useState<{x: number, y: number} | null>(null);
+
+  // Helper functions for unified selection system
+  const calculateBoundingBox = (items: SelectionItem[]): BoundingBox | null => {
+    if (items.length === 0) return null;
+
+    const allBounds: {x: number, y: number, width: number, height: number, rotation?: number}[] = [];
+
+    items.forEach(item => {
+      if (item.type === 'seat') {
+        const seat = seats.find(s => s.id === item.id);
+        if (seat) {
+          allBounds.push({x: seat.x - 10, y: seat.y - 10, width: 20, height: 20});
+        }
+      } else if (item.type === 'row') {
+        const row = rows.find(r => r.id === item.id);
+        if (row) {
+          allBounds.push({x: row.x, y: row.y, width: row.width, height: row.height});
+        }
+      } else if (item.type === 'shape') {
+        const shape = shapes.find(s => s.id === item.id);
+        if (shape) {
+          if (shape.type === 'rectangle') {
+            allBounds.push({x: shape.x || 0, y: shape.y || 0, width: shape.w || 0, height: shape.h || 0, rotation: shape.rotation});
+          } else if (shape.type === 'circle') {
+            allBounds.push({x: (shape.cx || 0) - (shape.r || 0), y: (shape.cy || 0) - (shape.r || 0), width: (shape.r || 0) * 2, height: (shape.r || 0) * 2, rotation: shape.rotation});
+          } else if (shape.type === 'oval') {
+            allBounds.push({x: (shape.cx || 0) - (shape.rx || 0), y: (shape.cy || 0) - (shape.ry || 0), width: (shape.rx || 0) * 2, height: (shape.ry || 0) * 2, rotation: shape.rotation});
+          } else if (shape.type === 'polygon' && shape.points && shape.points.length > 0) {
+            const xs = shape.points.map(p => p.x);
+            const ys = shape.points.map(p => p.y);
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+            allBounds.push({x: minX, y: minY, width: maxX - minX, height: maxY - minY, rotation: shape.rotation});
+          }
+        }
+      } else if (item.type === 'text') {
+        const text = texts.find(t => t.id === item.id);
+        if (text) {
+                  const width = (text.content.length * (text.fontSize || 16) * 0.6) || 40;
+        const height = (text.fontSize || 16) * 1.2;
+          allBounds.push({x: text.x - width/2, y: text.y - height/2, width, height, rotation: text.rotation});
+        }
+      }
+    });
+
+    if (allBounds.length === 0) return null;
+
+    const minX = Math.min(...allBounds.map(b => b.x));
+    const minY = Math.min(...allBounds.map(b => b.y));
+    const maxX = Math.max(...allBounds.map(b => b.x + b.width));
+    const maxY = Math.max(...allBounds.map(b => b.y + b.height));
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+      rotation: allBounds.length === 1 ? allBounds[0].rotation : 0
+    };
+  };
+
+  const updateSelectionBoundary = useCallback(() => {
+    const boundary = calculateBoundingBox(selectionItems);
+    setSelectionBoundary(boundary);
+  }, [selectionItems, seats, shapes, texts, seatGroups, rows]);
+
+  // Update boundary when selection changes
+  useEffect(() => {
+    updateSelectionBoundary();
+  }, [updateSelectionBoundary]);
+
+  const addToSelection = (item: SelectionItem) => {
+    setSelectionItems(prev => [...prev, item]);
+  };
+
+  const removeFromSelection = (itemId: string, itemType: string) => {
+    setSelectionItems(prev => prev.filter(item => !(item.id === itemId && item.type === itemType)));
+  };
+
+  const clearSelection = () => {
+    setSelectionItems([]);
+    setSelectionBoundary(null);
+  };
+
+  const selectItem = (item: SelectionItem, multiSelect: boolean = false) => {
+    if (multiSelect) {
+      const existing = selectionItems.find(i => i.id === item.id && i.type === item.type);
+      if (existing) {
+        removeFromSelection(item.id, item.type);
+      } else {
+        addToSelection(item);
+      }
+    } else {
+      setSelectionItems([item]);
+    }
+    setSelectionBoundary(calculateBoundingBox([item]));
+  };
+
+  // Selection operation handlers
+  const handleSelectionResizeStart = (corner: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeCorner(corner);
+    // TODO: Implement resize logic
+  };
+
+  const handleSelectionRotateStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsRotating(true);
+    if (selectionBoundary) {
+      setRotateOrigin({ x: selectionBoundary.cx, y: selectionBoundary.cy });
+    }
+    // TODO: Implement rotation logic
+  };
+
+  const handleSelectionMoveStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // TODO: Implement move logic for all selected items
+  };
 
   // Helper to snapshot current state
   const snapshot = () => ({
@@ -92,9 +239,18 @@ export default function SeatingEditorPage() {
     restore(next);
   };
 
-  const handleSeatClick = (seat: Seat) => setSelected({ type: 'seat', id: seat.id });
-  const handleAddSeats = (newSeats: any[]) => { pushUndo(); setSeats(prev => ([...prev, ...newSeats])); };
-  const handleAddText = (x: number, y: number) => { pushUndo(); const id = `text-${Date.now()}`; setTexts(prev => ([
+  const handleSeatClick = (seat: Seat) => {
+    setSelected({ type: 'seat', id: seat.id });
+    selectItem({ id: seat.id, type: 'seat' }, false);
+  };
+  const handleAddSeats = (newSeats: any[]) => { 
+    pushUndo(); 
+    setSeats(prev => ([...prev, ...newSeats])); 
+  };
+  const handleAddText = (x: number, y: number) => { 
+    pushUndo(); 
+    const id = `text-${Date.now()}`; 
+    setTexts(prev => ([
       ...prev,
       {
         id,
@@ -105,11 +261,15 @@ export default function SeatingEditorPage() {
         rotation: 0,
         fontSize: 16,
       },
-    ])); setSelectedTextId(id); };
+    ])); 
+    setSelectedTextId(id);
+    selectItem({ id, type: 'text' }, false);
+  };
 
   const handleTextClick = (id: string) => {
     setSelectedTextId(id);
     setEditingText(null);
+    selectItem({ id, type: 'text' }, false);
   };
   const handleTextEdit = (id: string) => {
     setEditingText(id);
@@ -141,9 +301,16 @@ export default function SeatingEditorPage() {
     setDragOffset(null);
   };
 
-  const handleTextAttrChange = (id: string, attr: Partial<{ content: string; color: string; rotation: number; fontSize: number; x: number; y: number }>) => { pushUndo(); setTexts(prev => prev.map(t => t.id === id ? { ...t, ...attr } : t)); };
+  const handleTextAttrChange = (id: string, attr: Partial<{ content: string; color: string; rotation: number; fontSize: number; x: number; y: number }>) => { 
+    pushUndo(); 
+    setTexts(prev => prev.map(t => t.id === id ? { ...t, ...attr } : t)); 
+  };
 
-  const handleAddShape = (shape: Shape) => { pushUndo(); setShapes(prev => [...prev, shape]); };
+  const handleAddShape = (shape: Shape) => { 
+    pushUndo(); 
+    setShapes(prev => [...prev, shape]); 
+    selectItem({ id: shape.id, type: 'shape' }, false);
+  };
 
   // Update handleUpdateShape to support _delete
   const handleUpdateShape = (id: string, partial: any) => {
@@ -162,15 +329,15 @@ export default function SeatingEditorPage() {
     if (!shape) return;
     let x = 0, y = 0;
     if (shape.type === 'rectangle') {
-      x = shape.x + shape.w / 2;
-      y = shape.y + shape.h / 2;
+      x = (shape.x || 0) + (shape.w || 0) / 2;
+      y = (shape.y || 0) + (shape.h || 0) / 2;
     } else if (shape.type === 'circle') {
-      x = shape.cx;
-      y = shape.cy;
+      x = shape.cx || 0;
+      y = shape.cy || 0;
     } else if (shape.type === 'oval') {
-      x = shape.cx;
-      y = shape.cy;
-    } else if (shape.type === 'polygon' && shape.points.length > 0) {
+      x = shape.cx || 0;
+      y = shape.cy || 0;
+    } else if (shape.type === 'polygon' && shape.points && shape.points.length > 0) {
       // centroid
       const pts = shape.points;
       const n = pts.length;
@@ -204,15 +371,15 @@ export default function SeatingEditorPage() {
       if (!shape) return prev;
       let x = 0, y = 0;
       if (shape.type === 'rectangle') {
-        x = shape.x + shape.w / 2;
-        y = shape.y + shape.h / 2;
+        x = (shape.x || 0) + (shape.w || 0) / 2;
+        y = (shape.y || 0) + (shape.h || 0) / 2;
       } else if (shape.type === 'circle') {
-        x = shape.cx;
-        y = shape.cy;
+        x = shape.cx || 0;
+        y = shape.cy || 0;
       } else if (shape.type === 'oval') {
-        x = shape.cx;
-        y = shape.cy;
-      } else if (shape.type === 'polygon' && shape.points.length > 0) {
+        x = shape.cx || 0;
+        y = shape.cy || 0;
+      } else if (shape.type === 'polygon' && shape.points && shape.points.length > 0) {
         const pts = shape.points;
         const n = pts.length;
         x = pts.reduce((sum, p) => sum + p.x, 0) / n;
@@ -246,7 +413,21 @@ export default function SeatingEditorPage() {
   };
 
   // 3. When deleting a shape, also delete its text
-  const handleDeleteShape = (shapeId: string) => { pushUndo(); setShapes(prev => prev.filter(s => s.id !== shapeId)); setTexts(prev => prev.filter(t => t.shapeId !== shapeId)); };
+  const handleDeleteShape = (shapeId: string) => { 
+    pushUndo(); 
+    setShapes(prev => prev.filter(s => s.id !== shapeId)); 
+    setTexts(prev => prev.filter(t => t.shapeId !== shapeId)); 
+  };
+
+  // Update shape selection handler
+  const handleShapeSelect = (shapeId: string | null) => {
+    if (shapeId) {
+      setSelectedShapeId(shapeId);
+      selectItem({ id: shapeId, type: 'shape' }, false);
+    } else {
+      setSelectedShapeId(null);
+    }
+  };
 
   // Update cut/copy/paste/delete handlers
   const handleCut = () => {
@@ -347,12 +528,30 @@ export default function SeatingEditorPage() {
   };
 
   const expandGrid = (step = 100) => {
+    const oldWidth = width;
+    const oldHeight = height;
     setWidth(w => w + step);
     setHeight(h => h + step);
+    
+    // Adjust viewBox to keep grid centered when expanding
+    setTimeout(() => {
+      if (centerPanRef.current) {
+        centerPanRef.current();
+      }
+    }, 0);
   };
   const shrinkGrid = (step = 100) => {
+    const oldWidth = width;
+    const oldHeight = height;
     setWidth(w => Math.max(100, w - step));
     setHeight(h => Math.max(100, h - step));
+    
+    // Adjust viewBox to keep grid centered when shrinking
+    setTimeout(() => {
+      if (centerPanRef.current) {
+        centerPanRef.current();
+      }
+    }, 0);
   };
 
   const handleCenter = () => {
@@ -405,7 +604,7 @@ export default function SeatingEditorPage() {
         const fill = (shape as any).fillColor || shape.color || 'none';
         const stroke = (shape as any).borderColor || shape.color || '#fbc02d';
         return `<ellipse cx="${shape.cx}" cy="${shape.cy}" rx="${shape.rx}" ry="${shape.ry}" fill="${fill}" stroke="${stroke}" stroke-width="2" />`;
-      } else if (shape.type === 'polygon') {
+      } else if (shape.type === 'polygon' && shape.points) {
         const fill = (shape as any).fillColor || shape.color || 'none';
         const stroke = (shape as any).borderColor || shape.color || '#d32f2f';
         return `<polygon points="${shape.points.map(pt => `${pt.x},${pt.y}`).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="2" />`;
@@ -413,9 +612,10 @@ export default function SeatingEditorPage() {
       return '';
     }).join('');
     const textSvgs = texts.filter(t => !t.shapeId).map(text => {
-      const width = (text.content.length * text.fontSize * 0.6) || 40;
-      const height = text.fontSize * 1.2;
-      return `<text x="${text.x}" y="${text.y}" text-anchor="middle" font-size="${text.fontSize}" fill="${text.color}" font-weight="bold">${text.content}</text>`;
+      const fontSize = text.fontSize || 16;
+      const width = (text.content.length * fontSize * 0.6) || 40;
+      const height = fontSize * 1.2;
+      return `<text x="${text.x}" y="${text.y}" text-anchor="middle" font-size="${fontSize}" fill="${text.color || '#333'}" font-weight="bold">${text.content}</text>`;
     }).join('');
     // SVG wrapper
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
@@ -543,10 +743,22 @@ export default function SeatingEditorPage() {
         e.preventDefault();
         return;
       }
+      // Escape to clear selection
+      if (e.key === 'Escape') {
+        clearSelection();
+        e.preventDefault();
+        return;
+      }
+      // A for select all (like pretix)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        // TODO: Implement select all
+        e.preventDefault();
+        return;
+      }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [undoStack, redoStack, selected, clipboard, seats, seatGroups, shapes, texts, selectedSeatIds, selectedGroupIds]);
+  }, [undoStack, redoStack, selected, clipboard, seats, seatGroups, shapes, texts, selectedSeatIds, selectedGroupIds, selectionItems]);
 
   // Add selectedSeat and selectedGroupId for SeatMapEditor
   const selectedSeat = selected?.type === 'seat' ? seats.find(s => s.id === selected.id) : null;
@@ -561,88 +773,343 @@ export default function SeatingEditorPage() {
   const canDelete = canCut;
   const canPaste = clipboard && (clipboard.seats?.length || clipboard.groups?.length);
 
+  // Handle seating editor events
+  const handleSeatingSelectionChange = (selectedSeats: string[], selectedZones: string[]) => {
+    setSelectedSeatIds(selectedSeats);
+    // TODO: Handle selectedZones
+  };
+
+  // Handle row selection
+  const handleRowClick = (row: Row) => {
+    selectItem({ id: row.id, type: 'row' }, false);
+  };
+
+  const handleSeatingSeatClick = (seat: any) => {
+    handleSeatClick(seat);
+  };
+
+  // Wrapper function to handle tool selection from toolbar
+  const handleToolSelect = (tool: string) => {
+    setActiveTool(tool as 'select' | 'row' | 'zone' | 'pan' | 'text' | 'rectangle' | 'circle' | 'oval' | 'polygon');
+  };
+
+  // File operations
+  const { saveToFile, openFromFile, exportToPdf, exportToSvg, validateSeatingPlan } = useFileOperations({
+    state: {
+      seats,
+      rows,
+      zones: [],
+      shapes,
+      texts,
+      activeTool,
+      zoom,
+      gridEnabled,
+      drawing: { isDrawing: false, startPoint: null, currentPoint: null, previewItems: [], spacing: 25, angle: 0 },
+      selection: { isSelecting: false, startPoint: null, currentPoint: null, selectedItems: [], boundary: null },
+      transform: { isRotating: false, isResizing: false, isMoving: false, rotateOrigin: null, resizeCorner: '', moveOffset: null },
+      clipboard: null,
+      undoStack: [],
+      redoStack: []
+    },
+    onStateChange: (newState) => {
+      if (newState.seats) setSeats(newState.seats);
+      if (newState.shapes) setShapes(newState.shapes);
+      if (newState.texts) setTexts(newState.texts);
+    }
+  });
+
+  // File operation handlers
+  const handleSave = () => {
+    saveToFile();
+  };
+
+  const handleOpen = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        openFromFile(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleValidate = () => {
+    validateSeatingPlan();
+  };
+
+  // Row operations
+  const handleAddSeat = (rowId: string) => {
+    const row = rows.find(r => r.id === rowId);
+    if (!row) return;
+
+    // Find seats in this row
+    const rowSeats = seats.filter(seat => seat.rowId === rowId);
+    const nextSeatNumber = rowSeats.length + 1;
+    
+    // Calculate position for new seat
+    const spacing = row.spacing || 25;
+    const newX = row.x + (nextSeatNumber - 1) * spacing;
+    const newY = row.y;
+
+    const newSeat: Seat = {
+      id: `seat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      x: newX,
+      y: newY,
+      label: `Seat ${nextSeatNumber}`,
+      rowId: rowId,
+      status: 'available',
+      price: 0,
+      category: '',
+      color: '#ffffff',
+      borderColor: '#000000'
+    };
+
+    setSeats(prev => [...prev, newSeat]);
+  };
+
+  const handleAlignOnCircleByRadius = (rowId: string) => {
+    const row = rows.find(r => r.id === rowId);
+    if (!row) return;
+
+    const rowSeats = seats.filter(seat => seat.rowId === rowId);
+    if (rowSeats.length === 0) return;
+
+    // Calculate center point of the row
+    const centerX = row.x + (rowSeats.length - 1) * (row.spacing || 25) / 2;
+    const centerY = row.y;
+    const radius = 100; // Default radius
+
+    // Align seats in a circle
+    const updatedSeats = rowSeats.map((seat, index) => {
+      const angle = (index * 2 * Math.PI) / rowSeats.length;
+      const newX = centerX + radius * Math.cos(angle);
+      const newY = centerY + radius * Math.sin(angle);
+      
+      return {
+        ...seat,
+        x: newX,
+        y: newY
+      };
+    });
+
+    setSeats(prev => prev.map(seat => {
+      const updatedSeat = updatedSeats.find(s => s.id === seat.id);
+      return updatedSeat || seat;
+    }));
+  };
+
+  const handleAlignOnCircleByCenter = (rowId: string) => {
+    const row = rows.find(r => r.id === rowId);
+    if (!row) return;
+
+    const rowSeats = seats.filter(seat => seat.rowId === rowId);
+    if (rowSeats.length === 0) return;
+
+    // Use the first seat as center
+    const centerSeat = rowSeats[0];
+    const centerX = centerSeat.x;
+    const centerY = centerSeat.y;
+    const radius = 80; // Default radius
+
+    // Align remaining seats in a circle around the center seat
+    const updatedSeats = rowSeats.slice(1).map((seat, index) => {
+      const angle = (index * 2 * Math.PI) / (rowSeats.length - 1);
+      const newX = centerX + radius * Math.cos(angle);
+      const newY = centerY + radius * Math.sin(angle);
+      
+      return {
+        ...seat,
+        x: newX,
+        y: newY
+      };
+    });
+
+    setSeats(prev => prev.map(seat => {
+      const updatedSeat = updatedSeats.find(s => s.id === seat.id);
+      return updatedSeat || seat;
+    }));
+  };
+
+
+
+  // Clipboard operations
+  const { copyToClipboard, cutToClipboard, pasteFromClipboard, deleteSelected, hasClipboardData } = useClipboardOperations({
+    selectedItems: selectionItems,
+    seats,
+    shapes,
+    texts,
+    onUpdateSeats: setSeats,
+    onUpdateShapes: setShapes,
+    onUpdateTexts: setTexts,
+    onClearSelection: clearSelection
+  });
+
+  const handleDeleteSelected = useCallback(() => {
+    const seatIdSet = new Set<string>(selectedSeatIds);
+    selectionItems.filter(i => i.type === 'seat').forEach(i => seatIdSet.add(i.id));
+    const shapeIdSet = new Set<string>(selectionItems.filter(i => i.type === 'shape').map(i => i.id));
+    const textIdSet = new Set<string>(selectionItems.filter(i => i.type === 'text').map(i => i.id));
+
+    if (seatIdSet.size === 0 && shapeIdSet.size === 0 && textIdSet.size === 0) return;
+
+    setSeats(prev => prev.filter(s => !seatIdSet.has(s.id)));
+    setShapes(prev => prev.filter(sh => !shapeIdSet.has(sh.id)));
+    setTexts(prev => prev.filter(tx => !textIdSet.has(tx.id)));
+    setSelectedSeatIds([]);
+    setSelectionItems([]);
+  }, [selectedSeatIds, selectionItems]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    activeTool,
+    onToolChange: handleToolSelect,
+    onUndo: handleUndo,
+    onRedo: handleRedo,
+    onCut: cutToClipboard,
+    onCopy: copyToClipboard,
+    onPaste: pasteFromClipboard,
+    onDelete: handleDeleteSelected,
+    onSelectAll: () => {
+      // TODO: Implement select all
+      console.log('Select all');
+    },
+    onClearSelection: () => {
+      clearSelection();
+    },
+    onZoomIn: handleZoomIn,
+    onZoomOut: handleZoomOut,
+    onZoomReset: handleZoomReset,
+    onGridToggle: handleGridToggle,
+    onFullscreen: handleFullscreen,
+    onPan: handlePan,
+    onCenter: handleCenter,
+    onExportPdf: exportToPdf,
+    onExportSvg: exportToSvg
+  });
+
+  const editorRef = useRef<SeatingEditorHandle | null>(null);
+
   return (
     <div ref={mainRef} className="flex flex-col h-screen w-screen bg-gray-100">
-      <Toolbar
-        activeTool={activeTool}
-        onToolSelect={setActiveTool}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onCut={handleCut}
-        onCopy={handleCopy}
-        onPaste={handlePaste}
-        onDelete={handleDelete}
-        zoom={zoom}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onZoomReset={handleZoomReset}
-        onCenter={handleCenter}
-        onPan={handlePan}
-        onFullscreen={handleFullscreen}
-        onExportPdf={handleExportPdf}
-        onExportSvg={handleExportSvg}
-        onGridToggle={handleGridToggle}
-        gridEnabled={gridEnabled}
-      />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <SidebarLeft />
-        <main className="flex-1 flex items-center justify-center bg-black overflow-auto">
-            <SeatMapEditor
-              seats={seats}
-              canvasWidth={width}
-              canvasHeight={height}
-              onSeatClick={handleSeatClick}
-              selected={selectedSeat}
-              activeTool={activeTool}
-              onAddSeats={handleAddSeats}
-              texts={texts}
-              onAddText={handleAddText}
-              selectedTextId={selectedTextId}
-              editingText={editingText}
-              onTextClick={handleTextClick}
-              onTextEdit={handleTextEdit}
-              onTextChange={handleTextChange}
-              onTextMoveStart={handleTextMoveStart}
-              onTextMove={handleTextMove}
-              onTextMoveEnd={handleTextMoveEnd}
-              onTextAttrChange={handleTextAttrChange}
-              shapes={shapes}
-              onAddShape={handleAddShape}
-              onUpdateShape={handleUpdateShape}
-              selectedShapeId={selectedShapeId}
-              setSelectedShapeId={setSelectedShapeId}
-              setSelectedTextId={setSelectedTextId}
-              zoom={zoom}
-              onCenterPan={setCenterPan}
-              gridEnabled={gridEnabled}
-              seatGroups={seatGroups}
-              onAddSeatGroup={handleAddSeatGroup}
-              selectedGroupId={selectedGroupId}
-              setSelectedGroupId={id => setSelected(id ? { type: 'group', id } : null)}
-              onUpdateSeatGroup={handleUpdateSeatGroup}
-              onUpdateSeatGroupRotation={handleUpdateSeatGroupRotation}
-              onSelectSeats={setSelectedSeatIds}
-              onSelectGroups={setSelectedGroupIds}
-            />
-         
-        </main>
-        <SidebarRight
-          canvasWidth={width}
-          canvasHeight={height}
-          onChangeWidth={setWidth}
-          onChangeHeight={setHeight}
-          onExpandGrid={expandGrid}
-          onShrinkGrid={shrinkGrid}
-          selectedText={texts.find(t => t.id === selectedTextId) || null}
-          onTextAttrChange={handleTextAttrChange}
-          selectedShape={selectedShapeId ? shapes.find(s => s.id === selectedShapeId) || null : null}
-          onUpdateShape={handleUpdateShape}
-          getShapeText={getShapeText}
-          onShapeTextChange={handleShapeTextChange}
-          onDeleteShape={handleDeleteShape}
+      {/* Toolbar at the top */}
+      <div className="flex-shrink-0">
+        <Toolbar
+          activeTool={activeTool}
+          onToolSelect={handleToolSelect}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onCut={cutToClipboard}
+          onCopy={copyToClipboard}
+          onPaste={pasteFromClipboard}
+          onDelete={handleDeleteSelected}
+          zoom={zoom}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onZoomReset={handleZoomReset}
+          onCenter={handleCenter}
+          onPan={handlePan}
+          onFullscreen={handleFullscreen}
+          onExportPdf={handleExportPdf}
+          onExportSvg={handleExportSvg}
+          onGridToggle={handleGridToggle}
+          gridEnabled={gridEnabled}
+          onHelp={() => setShowHelp(true)}
+          onSave={handleSave}
+          onOpen={handleOpen}
+          onValidate={handleValidate}
         />
       </div>
+      
+      {/* Main seating editor */}
+      <div className="flex-1 flex">
+        {/* Canvas area */}
+        <div className="flex-1 relative">
+          <SeatingEditor
+            ref={editorRef as any}
+            width={width}
+            height={height}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            gridEnabled={gridEnabled}
+            onSeatClick={handleSeatingSeatClick}
+            selectedSeats={selectedSeatIds}
+            onSelectionChange={handleSeatingSelectionChange}
+            activeTool={activeTool}
+            onToolChange={handleToolSelect}
+          />
+          
+          {/* Render rows overlay */}
+          {rows.map((row) => (
+            <div
+              key={row.id}
+              className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 cursor-pointer hover:bg-opacity-30 transition-all"
+              style={{
+                left: row.x,
+                top: row.y,
+                width: row.width,
+                height: row.height,
+                zIndex: 10
+              }}
+              onClick={() => handleRowClick(row)}
+              title={`Row ${row.label || row.id}`}
+            />
+          ))}
+        </div>
+        
+        {/* Properties panel */}
+        <PropertiesPanel
+          selectedItems={selectionItems}
+          seats={seats}
+          rows={rows}
+          zones={[]}
+          shapes={shapes}
+          texts={texts}
+          onUpdateSeat={(seatId, updates) => {
+            setSeats(prev => prev.map(seat => 
+              seat.id === seatId ? { ...seat, ...updates } : seat
+            ));
+          }}
+          onUpdateRow={(rowId, updates) => {
+            setRows(prev => prev.map(row => 
+              row.id === rowId ? { ...row, ...updates } : row
+            ));
+          }}
+          onUpdateShape={(shapeId, updates) => {
+            setShapes(prev => prev.map(shape => 
+              shape.id === shapeId ? { ...shape, ...updates } : shape
+            ));
+          }}
+          onUpdateText={(textId, updates) => {
+            setTexts(prev => prev.map(text => 
+              text.id === textId ? { ...text, ...updates } : text
+            ));
+          }}
+          onAddSeat={handleAddSeat}
+          onAlignOnCircleByRadius={handleAlignOnCircleByRadius}
+          onAlignOnCircleByCenter={handleAlignOnCircleByCenter}
+        />
+      </div>
+      
+      {/* Status Bar */}
+      <StatusBar
+        selectedCount={selectionItems.length}
+        totalSeats={seats.length}
+        zoom={zoom}
+        gridEnabled={gridEnabled}
+        activeTool={activeTool}
+        statusMessage={selectionItems.length > 0 ? `${selectionItems.length} items selected` : undefined}
+      />
+      
+      {/* Keyboard Shortcuts Help Modal */}
+      <KeyboardShortcutsHelp
+        isOpen={showHelp}
+        onClose={() => setShowHelp(false)}
+      />
+      
+
     </div>
   );
 } 

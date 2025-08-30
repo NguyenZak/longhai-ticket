@@ -16,6 +16,7 @@ export const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
     try {
       const token = localStorage.getItem('access_token');
+      console.log('🔧 getToken: Token from localStorage:', token ? 'found' : 'not found');
       return token && token !== 'undefined' && token !== 'null' ? token : null;
     } catch (error) {
       console.error('🔧 getToken error:', error);
@@ -71,6 +72,9 @@ export const apiCall = async (
 
   if (token) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
+    console.log('🔧 apiCall: Token found, adding Authorization header');
+  } else {
+    console.log('🔧 apiCall: No token found');
   }
 
   // Luôn đảm bảo endpoint gọi về backend Laravel
@@ -78,6 +82,9 @@ export const apiCall = async (
   let url = cleanEndpoint.startsWith('/api/')
     ? `${API_BASE_URL}${cleanEndpoint}`
     : `${API_BASE_URL}/api${cleanEndpoint}`;
+
+  console.log('🔧 apiCall: URL:', url);
+  console.log('🔧 apiCall: Headers:', defaultHeaders);
 
   const config: RequestInit = {
     ...options,
@@ -110,6 +117,7 @@ export const apiCall = async (
 
 // Login function
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
+  console.log('🔧 login: Starting login process for', email);
   
   const response = await fetch(`${API_BASE_URL}/api/login`, {
     method: 'POST',
@@ -121,17 +129,22 @@ export const login = async (email: string, password: string): Promise<LoginRespo
   });
 
   const data = await response.json();
+  console.log('🔧 login: API response status:', response.status);
 
   if (!response.ok) {
+    console.error('🔧 login: Login failed:', data);
     throw new Error(data.message || 'Đăng nhập thất bại');
   }
 
+  console.log('🔧 login: Login successful, storing token and user data');
+  
   // Store token and user data
   if (typeof window !== 'undefined') {
     localStorage.setItem('access_token', data.access_token);
     localStorage.setItem('user', JSON.stringify(data.user));
     // Lưu token vào cookie để middleware nhận diện
     document.cookie = `token=${data.access_token}; path=/;`;
+    console.log('🔧 login: Token and user data stored in localStorage');
   }
 
   return data;
@@ -158,6 +171,7 @@ export const isAuthenticated = (): boolean => {
   const token = getToken();
   const user = getUser();
   const authenticated = token !== null && user !== null;
+  console.log('🔧 isAuthenticated:', { token: !!token, user: !!user, authenticated });
   return authenticated;
 }; 
 
