@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Toolbar from './Toolbar';
 import SeatingEditor from './SeatingEditor';
-import type { SeatingEditorHandle } from './types';
 import PropertiesPanel from './PropertiesPanel';
 import StatusBar from './StatusBar';
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
@@ -811,7 +810,7 @@ export default function SeatingEditorPage() {
       undoStack: [],
       redoStack: []
     },
-    onStateChange: (newState) => {
+    onStateChange: (newState: any) => {
       if (newState.seats) setSeats(newState.seats);
       if (newState.shapes) setShapes(newState.shapes);
       if (newState.texts) setTexts(newState.texts);
@@ -990,7 +989,7 @@ export default function SeatingEditorPage() {
     onExportSvg: exportToSvg
   });
 
-  const editorRef = useRef<SeatingEditorHandle | null>(null);
+  
 
   return (
     <div ref={mainRef} className="flex flex-col h-screen w-screen bg-gray-100">
@@ -1028,7 +1027,6 @@ export default function SeatingEditorPage() {
         {/* Canvas area */}
         <div className="flex-1 relative">
           <SeatingEditor
-            ref={editorRef as any}
             width={width}
             height={height}
             zoom={zoom}
@@ -1059,38 +1057,41 @@ export default function SeatingEditorPage() {
           ))}
         </div>
         
-        {/* Properties panel */}
-        <PropertiesPanel
-          selectedItems={selectionItems}
-          seats={seats}
-          rows={rows}
-          zones={[]}
-          shapes={shapes}
-          texts={texts}
-          onUpdateSeat={(seatId, updates) => {
-            setSeats(prev => prev.map(seat => 
-              seat.id === seatId ? { ...seat, ...updates } : seat
-            ));
-          }}
-          onUpdateRow={(rowId, updates) => {
-            setRows(prev => prev.map(row => 
-              row.id === rowId ? { ...row, ...updates } : row
-            ));
-          }}
-          onUpdateShape={(shapeId, updates) => {
-            setShapes(prev => prev.map(shape => 
-              shape.id === shapeId ? { ...shape, ...updates } : shape
-            ));
-          }}
-          onUpdateText={(textId, updates) => {
-            setTexts(prev => prev.map(text => 
-              text.id === textId ? { ...text, ...updates } : text
-            ));
-          }}
-          onAddSeat={handleAddSeat}
-          onAlignOnCircleByRadius={handleAlignOnCircleByRadius}
-          onAlignOnCircleByCenter={handleAlignOnCircleByCenter}
-        />
+        {/* Right side panels */}
+        <div className="w-[640px] flex flex-col border-l border-gray-200">
+          <PropertiesPanel
+            selectedItems={selectionItems}
+            seats={seats}
+            rows={rows}
+            zones={[]}
+            shapes={shapes}
+            texts={texts}
+            onUpdateSeat={(seatId, updates) => {
+              setSeats(prev => prev.map(seat => 
+                seat.id === seatId ? { ...seat, ...updates } : seat
+              ));
+            }}
+            onUpdateRow={(rowId, updates) => {
+              setRows(prev => prev.map(row => 
+                row.id === rowId ? { ...row, ...updates } : row
+              ));
+            }}
+            onUpdateShape={(shapeId, updates) => {
+              setShapes(prev => prev.map(shape => 
+                shape.id === shapeId ? { ...shape, ...updates } : shape
+              ));
+            }}
+            onUpdateText={(textId, updates) => {
+              setTexts(prev => prev.map(text => 
+                text.id === textId ? { ...text, ...updates } : text
+              ));
+            }}
+            onAddSeat={handleAddSeat}
+            onAlignOnCircleByRadius={handleAlignOnCircleByRadius}
+            onAlignOnCircleByCenter={handleAlignOnCircleByCenter}
+          />
+          {/* SavedPlans moved to global sidebar */}
+        </div>
       </div>
       
       {/* Status Bar */}

@@ -36,6 +36,8 @@ import { usePathname } from 'next/navigation';
 import { getTranslation } from '@/i18n';
 import IconHome from '@/components/icon/icon-home';
 import IconFile from '@/components/icon/icon-file';
+import dynamic from 'next/dynamic';
+const SavedPlansSidebar = dynamic(() => import('@/components/seating/SavedPlansSidebar'), { ssr: false });
 
 const Sidebar = () => {
     const dispatch = useDispatch();
@@ -292,6 +294,8 @@ const Sidebar = () => {
                                             </div>
                                         </Link>
                                     </li>
+                                    {/* Saved plans right below Seating */}
+                                    <SavedPlansSidebar />
                                     <li className="nav-item">
                                         <Link href="/banners" className="group">
                                             <div className="flex items-center">
